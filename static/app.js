@@ -901,27 +901,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const riskLevel = morosidad > 20 ? "CRÍTICO" : (morosidad > 10 ? "MODERADO" : "BAJO");
 
-            analysisHTML = `
-                <strong>Evaluación General de Riesgo:</strong> La cartera consolidada para <strong>${displayNameFilial}</strong> presenta un nivel de riesgo <strong>${riskLevel}</strong> con un índice de morosidad del <strong>${morosidad.toFixed(1)}%</strong> sobre un saldo total de <strong>${formatActiveVal(kpis.cartera_total)}</strong>.<br><br>
-                <strong>Hallazgos Clave:</strong>
-                <ul style="margin: 5px 0 10px 18px; padding: 0; list-style-type: disc;">
-            `;
-
-            // Hallazgo 1: DSO
-            if (kpis.dso > 60) {
-                analysisHTML += `<li style="margin-bottom: 4px;">El Período Medio de Cobro (DSO) es de <strong>${kpis.dso} días</strong>, indicando retrasos graves y afectando el flujo de caja operativo.</li>`;
-            } else if (kpis.dso > 35) {
-                analysisHTML += `<li style="margin-bottom: 4px;">El DSO de <strong>${kpis.dso} días</strong> muestra tiempos de rotación controlados, pero con oportunidades de mejora.</li>`;
+            let riskDesc = "";
+            if (morosidad > 20) {
+                riskDesc = `El índice de morosidad consolidado se sitúa en un <strong>${morosidad.toFixed(1)}%</strong>, excediendo los límites internos tolerables y situando la operación de <strong>${displayNameFilial}</strong> en un rango de riesgo <strong>CRÍTICO</strong>. Es imperativa la intervención inmediata de la Dirección Financiera para regularizar las cuentas con mayor antigüedad.`;
+            } else if (morosidad > 10) {
+                riskDesc = `El índice de morosidad consolidado registra un <strong>${morosidad.toFixed(1)}%</strong> para <strong>${displayNameFilial}</strong>, lo que representa un riesgo <strong>MODERADO</strong> con alertas preventivas activadas. Se recomienda un monitoreo estrecho sobre los compromisos de pago en mora intermedia para evitar su migración a carteras de difícil cobro.`;
             } else {
-                analysisHTML += `<li style="margin-bottom: 4px;">Excelente eficiencia en cobranzas con un DSO óptimo de <strong>${kpis.dso} días</strong>.</li>`;
+                riskDesc = `La calidad del portafolio para <strong>${displayNameFilial}</strong> se mantiene en un nivel <strong>SALUDABLE</strong>, con un índice de morosidad controlado del <strong>${morosidad.toFixed(1)}%</strong> sobre el total de <strong>${formatActiveVal(kpis.cartera_total)}</strong> administrables. Las políticas de crédito demuestran efectividad.`;
             }
 
-            // Hallazgo 2: Clientes Críticos
+            let dsoDesc = "";
+            if (kpis.dso > 60) {
+                dsoDesc = `El Período Medio de Cobro (DSO) se registra en <strong>${kpis.dso} días</strong>, lo cual evidencia una rotación lenta que impacta de forma directa el flujo de caja libre corporativo.`;
+            } else if (kpis.dso > 35) {
+                dsoDesc = `El ciclo de recaudo (DSO) se sitúa en <strong>${kpis.dso} días</strong>, manteniéndose en un rango estándar de negociación y recuperación comercial.`;
+            } else {
+                dsoDesc = `El ciclo de conversión de cuentas por cobrar (DSO) de <strong>${kpis.dso} días</strong> denota una sobresaliente eficiencia de cobro y una rápida conversión de activos líquidos.`;
+            }
+
+            let topDebtorDesc = "";
             if (top5Labels.length > 0) {
-                analysisHTML += `<li style="margin-bottom: 4px;">El cliente con mayor morosidad es <strong>${top5Labels[0]}</strong> con una deuda vencida de <strong>${formatActiveVal(top5Values[0])}</strong>.</li>`;
+                topDebtorDesc = `La exposición individual de riesgo más significativa se concentra en <strong>${top5Labels[0]}</strong>, con una obligación vencida de <strong>${formatActiveVal(top5Values[0])}</strong>.`;
             }
 
-            // Hallazgo 3: Filiales (Solo si no es una filial específica filtrada)
+            let regionalDesc = "";
             if (activeFilial === "Todos" && filData && filData.length > 0) {
                 let maxMoraFil = null;
                 filData.forEach(f => {
@@ -930,22 +933,35 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 });
                 if (maxMoraFil && maxMoraFil.morosidad > 10) {
-                    analysisHTML += `<li style="margin-bottom: 4px;">La filial regional con mayor vulnerabilidad es <strong>${maxMoraFil.name.replace(" (BU)", "")}</strong>, con un índice de mora de <strong>${maxMoraFil.morosidad.toFixed(1)}%</strong>.</li>`;
+                    regionalDesc = `A nivel regional, la operación de <strong>${maxMoraFil.name.replace(" (BU)", "")}</strong> reporta el mayor índice de desviación relativa con un <strong>${maxMoraFil.morosidad.toFixed(1)}%</strong> de mora.`;
                 }
             }
 
-            // Hallazgo 4: Costo de Oportunidad / Costo de Mora
+            let financialImpact = "";
             if (kpis.costo_mora > 0) {
-                analysisHTML += `<li style="margin-bottom: 4px;">El impacto financiero por costo de oportunidad de la cartera vencida asciende a <strong>${formatActiveVal(kpis.costo_mora)}</strong>.</li>`;
+                financialImpact = `El impacto financiero estimado por costo de oportunidad del capital retenido es de <strong>${formatActiveVal(kpis.costo_mora)}</strong>.`;
             }
 
-            analysisHTML += `
-                </ul>
-                <strong>Acción de Mitigación Recomendada:</strong> Priorizar la negociación y cobro directo sobre las cuentas de riesgo tipo D y E. Para el cliente <strong>${top5Labels[0] || 'crítico principal'}</strong>, se aconseja suspender créditos temporales hasta regularizar saldos.
+            let mitigationText = "";
+            if (morosidad > 20) {
+                mitigationText = `<strong>Plan de Acción Requerido:</strong> Suspender inmediatamente nuevos créditos a clientes en categorías D y E, iniciar gestiones formales de conciliación con <strong>${top5Labels[0] || 'deudores críticos'}</strong> y redefinir las metas de cobro para las regionales más vulnerables.`;
+            } else if (morosidad > 10) {
+                mitigationText = `<strong>Acciones Preventivas:</strong> Reforzar el seguimiento preventivo a facturas próximas a vencer, establecer comités semanales de recaudo y estructurar acuerdos de pago específicos con <strong>${top5Labels[0] || 'clientes clave'}</strong>.`;
+            } else {
+                mitigationText = `<strong>Monitoreo de Sostenibilidad:</strong> Mantener el esquema actual de cobranza proactiva, incentivar el pronto pago y realizar auditorías periódicas a los cupos de crédito aprobados.`;
+            }
+
+            analysisHTML = `
+                <p style="margin: 0 0 8px 0; text-align: justify;">
+                    ${riskDesc} ${dsoDesc} ${topDebtorDesc} ${regionalDesc} ${financialImpact}
+                </p>
+                <p style="margin: 0; text-align: justify;">
+                    ${mitigationText}
+                </p>
             `;
 
             analysisContainer.style.background = analysisBg;
-            analysisContainer.style.borderLeft = `4px solid ${analysisBorder}`;
+            analysisContainer.style.borderLeft = `3px solid ${analysisBorder}`;
             analysisContainer.style.color = analysisColor;
             analysisContainer.innerHTML = analysisHTML;
 
