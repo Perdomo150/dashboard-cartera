@@ -882,6 +882,73 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             }
             
+            // 5.5 Generar Análisis Ejecutivo Dinámico
+            const analysisContainer = document.getElementById("pdf-executive-analysis");
+            let analysisHTML = "";
+            let analysisBg = "#f0fdf4";
+            let analysisBorder = "#10b981";
+            let analysisColor = "#14532d";
+
+            if (morosidad > 20) {
+                analysisBg = "#fef2f2";
+                analysisBorder = "#ef4444";
+                analysisColor = "#7f1d1d";
+            } else if (morosidad > 10) {
+                analysisBg = "#fffbeb";
+                analysisBorder = "#f59e0b";
+                analysisColor = "#713f12";
+            }
+
+            const riskLevel = morosidad > 20 ? "CRÍTICO" : (morosidad > 10 ? "MODERADO" : "BAJO");
+
+            analysisHTML = `
+                <strong>Evaluación General de Riesgo:</strong> La cartera consolidada para <strong>${displayNameFilial}</strong> presenta un nivel de riesgo <strong>${riskLevel}</strong> con un índice de morosidad del <strong>${morosidad.toFixed(1)}%</strong> sobre un saldo total de <strong>${formatActiveVal(kpis.cartera_total)}</strong>.<br><br>
+                <strong>Hallazgos Clave:</strong>
+                <ul style="margin: 5px 0 10px 18px; padding: 0; list-style-type: disc;">
+            `;
+
+            // Hallazgo 1: DSO
+            if (kpis.dso > 60) {
+                analysisHTML += `<li style="margin-bottom: 4px;">El Período Medio de Cobro (DSO) es de <strong>${kpis.dso} días</strong>, indicando retrasos graves y afectando el flujo de caja operativo.</li>`;
+            } else if (kpis.dso > 35) {
+                analysisHTML += `<li style="margin-bottom: 4px;">El DSO de <strong>${kpis.dso} días</strong> muestra tiempos de rotación controlados, pero con oportunidades de mejora.</li>`;
+            } else {
+                analysisHTML += `<li style="margin-bottom: 4px;">Excelente eficiencia en cobranzas con un DSO óptimo de <strong>${kpis.dso} días</strong>.</li>`;
+            }
+
+            // Hallazgo 2: Clientes Críticos
+            if (top5Labels.length > 0) {
+                analysisHTML += `<li style="margin-bottom: 4px;">El cliente con mayor morosidad es <strong>${top5Labels[0]}</strong> con una deuda vencida de <strong>${formatActiveVal(top5Values[0])}</strong>.</li>`;
+            }
+
+            // Hallazgo 3: Filiales (Solo si no es una filial específica filtrada)
+            if (activeFilial === "Todos" && filData && filData.length > 0) {
+                let maxMoraFil = null;
+                filData.forEach(f => {
+                    if (f.cartera_total > 0 && (!maxMoraFil || f.morosidad > maxMoraFil.morosidad)) {
+                        maxMoraFil = f;
+                    }
+                });
+                if (maxMoraFil && maxMoraFil.morosidad > 10) {
+                    analysisHTML += `<li style="margin-bottom: 4px;">La filial regional con mayor vulnerabilidad es <strong>${maxMoraFil.name.replace(" (BU)", "")}</strong>, con un índice de mora de <strong>${maxMoraFil.morosidad.toFixed(1)}%</strong>.</li>`;
+                }
+            }
+
+            // Hallazgo 4: Costo de Oportunidad / Costo de Mora
+            if (kpis.costo_mora > 0) {
+                analysisHTML += `<li style="margin-bottom: 4px;">El impacto financiero por costo de oportunidad de la cartera vencida asciende a <strong>${formatActiveVal(kpis.costo_mora)}</strong>.</li>`;
+            }
+
+            analysisHTML += `
+                </ul>
+                <strong>Acción de Mitigación Recomendada:</strong> Priorizar la negociación y cobro directo sobre las cuentas de riesgo tipo D y E. Para el cliente <strong>${top5Labels[0] || 'crítico principal'}</strong>, se aconseja suspender créditos temporales hasta regularizar saldos.
+            `;
+
+            analysisContainer.style.background = analysisBg;
+            analysisContainer.style.borderLeft = `4px solid ${analysisBorder}`;
+            analysisContainer.style.color = analysisColor;
+            analysisContainer.innerHTML = analysisHTML;
+
             // 6. Generar PDF
             const element = document.getElementById("pdf-report-template");
             const opt = {

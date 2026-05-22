@@ -459,7 +459,8 @@
     </div>
     
     <!-- Contenedor del Reporte Ejecutivo PDF (Oculto en pantalla, formateado para PDF) -->
-    <div id="pdf-report-template" style="position: absolute; left: -9999px; top: -9999px; width: 800px; background: #ffffff; color: #1e293b; padding: 40px; font-family: 'Outfit', sans-serif; box-sizing: border-box;">
+    <div style="width: 0; height: 0; overflow: hidden; position: absolute; top: 0; left: 0; z-index: -9999;">
+        <div id="pdf-report-template" style="width: 800px; background: #ffffff; color: #1e293b; padding: 40px; font-family: 'Outfit', sans-serif; box-sizing: border-box;">
         <!-- Cabecera -->
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 20px; margin-bottom: 30px;">
             <div style="display: flex; align-items: center; gap: 15px;">
@@ -549,8 +550,14 @@
             </tbody>
         </table>
 
+        <!-- Análisis Ejecutivo Dinámico -->
+        <h3 style="font-size: 13px; font-weight: 800; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; color: #0f172a; text-transform: uppercase;">Análisis Ejecutivo de Cartera</h3>
+        <div id="pdf-executive-analysis" style="padding: 12px 15px; border-left: 4px solid #10b981; background: #f0fdf4; border-radius: 4px; font-size: 11px; color: #14532d; line-height: 1.5; margin-bottom: 30px; box-sizing: border-box;">
+            <!-- Se llena dinámicamente -->
+        </div>
+
         <!-- Firmas y Pie de Página -->
-        <div style="margin-top: 50px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 25px; font-size: 10px; color: #64748b;">
+        <div style="margin-top: 40px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 10px; color: #64748b;">
             <div>
                 <strong>Elaborado por:</strong> L. Valentina Ortiz Rivera (Prácticas UPC)<br>
                 <strong>Institución:</strong> Universidad Piloto de Colombia
@@ -561,6 +568,7 @@
             </div>
         </div>
     </div>
+</div>
 
     <script src="/static/app.js"></script>
 </body>
