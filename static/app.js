@@ -875,94 +875,76 @@ document.addEventListener("DOMContentLoaded", () => {
                     const val = top5Values[idx];
                     tbody.innerHTML += `
                         <tr style="border-bottom: 1px solid #e2e8f0;">
-                            <td style="padding: 8px 10px; color: #0f172a; font-weight: 500;">${label}</td>
-                            <td style="padding: 8px 10px; text-align: right; color: #ef4444; font-weight: 700;">${formatActiveVal(val)}</td>
+                            <td style="padding: 10px 15px; color: #0f172a; font-weight: 500;">${label}</td>
+                            <td style="padding: 10px 15px; text-align: right; color: #ef4444; font-weight: 700;">${formatActiveVal(val)}</td>
                         </tr>
                     `;
                 });
             }
             
-            // 5.5 Generar Análisis Ejecutivo Dinámico
+            // 5.5 Generar Análisis Ejecutivo Dinámico (Creativo y Corporativo)
             const analysisContainer = document.getElementById("pdf-executive-analysis");
-            let analysisHTML = "";
-            let analysisBg = "#f0fdf4";
-            let analysisBorder = "#10b981";
-            let analysisColor = "#14532d";
-
-            if (morosidad > 20) {
-                analysisBg = "#fef2f2";
-                analysisBorder = "#ef4444";
-                analysisColor = "#7f1d1d";
-            } else if (morosidad > 10) {
-                analysisBg = "#fffbeb";
-                analysisBorder = "#f59e0b";
-                analysisColor = "#713f12";
-            }
-
-            const riskLevel = morosidad > 20 ? "CRÍTICO" : (morosidad > 10 ? "MODERADO" : "BAJO");
-
-            let riskDesc = "";
-            if (morosidad > 20) {
-                riskDesc = `El índice de morosidad consolidado se sitúa en un <strong>${morosidad.toFixed(1)}%</strong>, excediendo los límites internos tolerables y situando la operación de <strong>${displayNameFilial}</strong> en un rango de riesgo <strong>CRÍTICO</strong>. Es imperativa la intervención inmediata de la Dirección Financiera para regularizar las cuentas con mayor antigüedad.`;
-            } else if (morosidad > 10) {
-                riskDesc = `El índice de morosidad consolidado registra un <strong>${morosidad.toFixed(1)}%</strong> para <strong>${displayNameFilial}</strong>, lo que representa un riesgo <strong>MODERADO</strong> con alertas preventivas activadas. Se recomienda un monitoreo estrecho sobre los compromisos de pago en mora intermedia para evitar su migración a carteras de difícil cobro.`;
-            } else {
-                riskDesc = `La calidad del portafolio para <strong>${displayNameFilial}</strong> se mantiene en un nivel <strong>SALUDABLE</strong>, con un índice de morosidad controlado del <strong>${morosidad.toFixed(1)}%</strong> sobre el total de <strong>${formatActiveVal(kpis.cartera_total)}</strong> administrables. Las políticas de crédito demuestran efectividad.`;
-            }
-
-            let dsoDesc = "";
+            
+            const riskLevel = morosidad > 20 ? "CRÍTICO" : (morosidad > 10 ? "PREVENTIVO" : "ESTABLE");
+            let statusColor = morosidad > 20 ? "#ef4444" : (morosidad > 10 ? "#f59e0b" : "#10b981");
+            
+            // Hallazgos Principales
+            let findings = [];
+            findings.push(`La morosidad general se sitúa en <strong>${morosidad.toFixed(1)}%</strong>, nivel clasificado de riesgo <strong>${riskLevel}</strong>.`);
+            
             if (kpis.dso > 60) {
-                dsoDesc = `El Período Medio de Cobro (DSO) se registra en <strong>${kpis.dso} días</strong>, lo cual evidencia una rotación lenta que impacta de forma directa el flujo de caja libre corporativo.`;
-            } else if (kpis.dso > 35) {
-                dsoDesc = `El ciclo de recaudo (DSO) se sitúa en <strong>${kpis.dso} días</strong>, manteniéndose en un rango estándar de negociación y recuperación comercial.`;
+                findings.push(`El ciclo operativo (DSO) alcanza <strong>${kpis.dso} días</strong>, lo que ralentiza sustancialmente la liquidez.`);
             } else {
-                dsoDesc = `El ciclo de conversión de cuentas por cobrar (DSO) de <strong>${kpis.dso} días</strong> denota una sobresaliente eficiencia de cobro y una rápida conversión de activos líquidos.`;
+                findings.push(`Alta eficiencia operativa reflejada en un ciclo de cobro de <strong>${kpis.dso} días</strong>.`);
             }
-
-            let topDebtorDesc = "";
-            if (top5Labels.length > 0) {
-                topDebtorDesc = `La exposición individual de riesgo más significativa se concentra en <strong>${top5Labels[0]}</strong>, con una obligación vencida de <strong>${formatActiveVal(top5Values[0])}</strong>.`;
-            }
-
-            let regionalDesc = "";
-            if (activeFilial === "Todos" && filData && filData.length > 0) {
-                let maxMoraFil = null;
-                filData.forEach(f => {
-                    if (f.cartera_total > 0 && (!maxMoraFil || f.morosidad > maxMoraFil.morosidad)) {
-                        maxMoraFil = f;
-                    }
-                });
-                if (maxMoraFil && maxMoraFil.morosidad > 10) {
-                    regionalDesc = `A nivel regional, la operación de <strong>${maxMoraFil.name.replace(" (BU)", "")}</strong> reporta el mayor índice de desviación relativa con un <strong>${maxMoraFil.morosidad.toFixed(1)}%</strong> de mora.`;
-                }
-            }
-
-            let financialImpact = "";
+            
+            let impactHtml = "";
             if (kpis.costo_mora > 0) {
-                financialImpact = `El impacto financiero estimado por costo de oportunidad del capital retenido es de <strong>${formatActiveVal(kpis.costo_mora)}</strong>.`;
+                impactHtml = `<div style="margin-bottom: 6px;"><span style="color: #64748b;">Costo Oportunidad:</span> <strong>${formatActiveVal(kpis.costo_mora)}</strong> retenidos comercialmente.</div>`;
             }
-
-            let mitigationText = "";
-            if (morosidad > 20) {
-                mitigationText = `<strong>Plan de Acción Requerido:</strong> Suspender inmediatamente nuevos créditos a clientes en categorías D y E, iniciar gestiones formales de conciliación con <strong>${top5Labels[0] || 'deudores críticos'}</strong> y redefinir las metas de cobro para las regionales más vulnerables.`;
-            } else if (morosidad > 10) {
-                mitigationText = `<strong>Acciones Preventivas:</strong> Reforzar el seguimiento preventivo a facturas próximas a vencer, establecer comités semanales de recaudo y estructurar acuerdos de pago específicos con <strong>${top5Labels[0] || 'clientes clave'}</strong>.`;
+            if (top5Labels.length > 0) {
+                impactHtml += `<div><span style="color: #64748b;">Concentración Riesgo:</span> <strong>${top5Labels[0]}</strong> lidera con ${formatActiveVal(top5Values[0])} vencidos.</div>`;
             } else {
-                mitigationText = `<strong>Monitoreo de Sostenibilidad:</strong> Mantener el esquema actual de cobranza proactiva, incentivar el pronto pago y realizar auditorías periódicas a los cupos de crédito aprobados.`;
+                impactHtml += `<div>No se registran concentraciones críticas de riesgo individualizado actualmente.</div>`;
             }
 
-            analysisHTML = `
-                <p style="margin: 0 0 8px 0; text-align: justify;">
-                    ${riskDesc} ${dsoDesc} ${topDebtorDesc} ${regionalDesc} ${financialImpact}
-                </p>
-                <p style="margin: 0; text-align: justify;">
-                    ${mitigationText}
-                </p>
+            let strategyText = "";
+            if (morosidad > 20) {
+                strategyText = `Se requiere comité de crédito inmediato. Bloquear la expedición de certificados a <strong>${top5Labels[0] || 'entidades principales'}</strong> hasta formalizar un acuerdo de pago vigente.`;
+            } else if (morosidad > 10) {
+                strategyText = `Activar protocolos de cobro persuasivo. Realizar acercamientos de control con cuentas que presentan más de 60 días de vencimiento continuo.`;
+            } else {
+                strategyText = `Sostener los esquemas de recaudación. Continuar fomentando descuentos por pronto pago para apalancar el capital circulante sano.`;
+            }
+
+            const analysisHTML = `
+                <div style="display: flex; gap: 15px; font-size: 10px;">
+                    <!-- Columna 1: Diagnóstico -->
+                    <div style="flex: 1.2; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; border-top: 3px solid ${statusColor};">
+                        <h4 style="margin: 0 0 10px 0; font-size: 10px; color: #0f172a; text-transform: uppercase;">1. Hallazgos Principales</h4>
+                        <ul style="margin: 0; padding-left: 15px; color: #334155; display: flex; flex-direction: column; gap: 6px; line-height: 1.4;">
+                            ${findings.map(f => `<li>${f}</li>`).join('')}
+                        </ul>
+                    </div>
+                    
+                    <!-- Columna 2: Impactos -->
+                    <div style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px;">
+                        <h4 style="margin: 0 0 10px 0; font-size: 10px; color: #0f172a; text-transform: uppercase;">2. Impacto Financiero</h4>
+                        <div style="color: #334155; line-height: 1.4;">
+                            ${impactHtml}
+                        </div>
+                    </div>
+                    
+                    <!-- Columna 3: Acción -->
+                    <div style="flex: 1; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 12px;">
+                        <h4 style="margin: 0 0 10px 0; font-size: 10px; color: #0369a1; text-transform: uppercase;">3. Acción Estratégica</h4>
+                        <div style="color: #0c4a6e; line-height: 1.4;">
+                            ${strategyText}
+                        </div>
+                    </div>
+                </div>
             `;
 
-            analysisContainer.style.background = analysisBg;
-            analysisContainer.style.borderLeft = `3px solid ${analysisBorder}`;
-            analysisContainer.style.color = analysisColor;
             analysisContainer.innerHTML = analysisHTML;
 
             // 6. Generar PDF
