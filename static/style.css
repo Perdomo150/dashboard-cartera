@@ -508,16 +508,11 @@ body {
 .chart-wrapper {
     position: relative;
     width: 100%;
-    min-height: 280px;
-    max-height: 320px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    height: 280px;
 }
 
 .chart-wrapper.tall {
-    min-height: 420px;
-    max-height: 480px;
+    height: 420px;
 }
 
 /* Monitoreo de Filiales con Barras de Progreso */

@@ -170,7 +170,7 @@ def generate_mock_data():
     return df
 
 def get_data():
-    """Obtiene el conjunto de datos de trabajo actual. Inicia en vacío por requerimiento del usuario."""
+    """Obtiene el conjunto de datos de trabajo actual. Carga datos base por defecto."""
     global CURRENT_DATA
     if CURRENT_DATA is not None:
         return CURRENT_DATA
@@ -180,14 +180,18 @@ def get_data():
         CURRENT_DATA = real_data
         return CURRENT_DATA
         
-    # Iniciar vacío por defecto para forzar la carga inicial de datos en el tab ETL
-    cols = [
-        "FacturaID", "ClienteID", "ClienteNombre", "Sector", "Region", "Riesgo", 
-        "FechaFactura", "FechaVencimiento", "FechaPago", "MontoFacturado", 
-        "MontoRecaudado", "Saldo", "TasaCostoOportunidad", "VentasCredito",
-        "UnidadNegocio", "Moneda", "DiasMora"
-    ]
-    return pd.DataFrame(columns=cols)
+    # Intentar leer cartera_base.csv local/persistida
+    base_file = os.path.join(DATA_DIR, "cartera_base.csv")
+    if os.path.exists(base_file):
+        try:
+            CURRENT_DATA = pd.read_csv(base_file, encoding="utf-8")
+            return CURRENT_DATA
+        except Exception:
+            pass
+            
+    # Si no hay datos, generar datos de demostración automáticos (Ideal para Vercel)
+    CURRENT_DATA = generate_mock_data()
+    return CURRENT_DATA
 
 def get_filtered_data():
     """Retorna el DataFrame activo filtrado de acuerdo con los dropdowns del dashboard."""
