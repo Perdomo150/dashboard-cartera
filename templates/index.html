@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Financiero - Gestión de Cartera</title>
+    <!-- Google Fonts: Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- html2pdf.js for premium PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Leaflet.js Map Library -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <img src="/static/icontec_logo.png" alt="Icontec Logo" class="sidebar-logo-img">
+            </div>
+            
+            <nav class="sidebar-menu">
+                <button class="menu-item active" data-tab="dashboard">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Dashboard de Cartera</span>
+                </button>
+                <button class="menu-item" data-tab="etl">
+                    <i data-lucide="database"></i>
+                    <span>Procesador de Datos (ETL)</span>
+                </button>
+                <button class="menu-item" data-tab="dax">
+                    <i data-lucide="code-xml"></i>
+                    <span>Integración DAX & PBI</span>
+                </button>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="student-info">
+                    <p class="role">Practicante de Cartera</p>
+                    <p class="name">L. Valentina Ortiz R.</p>
+                    <p class="institution">U. Piloto de Colombia</p>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Top Header -->
+            <header class="top-header">
+                <div class="header-title">
+                    <h2 id="page-title">Dashboard Analítico de Cartera</h2>
+                    <p id="page-subtitle">Monitoreo en tiempo real e indicadores clave financieros</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="btn-export-pdf" title="Exportar Reporte Ejecutivo en PDF" style="background: linear-gradient(135deg, var(--accent-blue) 0%, #0369a1 100%); border: none; box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);">
+                        <i data-lucide="file-text"></i>
+                        <span>Reporte PDF</span>
+                    </button>
+                    <button class="btn btn-secondary" id="btn-reset-data" title="Restaurar datos simulados por defecto">
+                        <i data-lucide="rotate-ccw"></i>
+                        <span>Reiniciar Datos</span>
+                    </button>
+                    <div class="indicator-tag">
+                        <span class="pulse-dot"></span>
+                        <span id="data-status-text">Datos en Línea</span>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Page: Dashboard -->
+            <section class="tab-content active" id="tab-dashboard">
+                <!-- Dynamic Filters Bar -->
+                <div class="filters-bar">
+                    <div class="filter-item">
+                        <label for="filter-filial"><i data-lucide="globe"></i> Filial / País</label>
+                        <select id="filter-filial" class="filter-select">
+                            <option value="Todos">Todas las Filiales (Global)</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label for="filter-moneda"><i data-lucide="coins"></i> Moneda</label>
+                        <select id="filter-moneda" class="filter-select">
+                            <option value="Todos">Todas las Monedas</option>
+                        </select>
+                    </div>
+                    <div class="filter-actions">
+                        <button class="btn btn-secondary btn-sm" id="btn-clear-filters" title="Limpiar todos los filtros">
+                            <i data-lucide="filter-x"></i>
+                            <span>Limpiar Filtros</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KPI Grid -->
+                <div class="kpi-grid">
+                    <div class="kpi-card" id="card-cartera-total">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Cartera Total</span>
+                            <div class="kpi-icon icon-blue">
+                                <i data-lucide="dollar-sign"></i>
+                            </div>
+                        </div>
+                        <div class="kpi-value" id="kpi-total-val">$0</div>
+                        <div class="kpi-footer">
+                            <span class="kpi-trend text-neutral">Saldo bruto total por cobrar</span>
+                        </div>
+                    </div>
+                    
+                    <div class="kpi-card" id="card-cartera-vencida">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Cartera Vencida</span>
+                            <div class="kpi-icon icon-red">
+                                <i data-lucide="alert-circle"></i>
+                            </div>
+                        </div>
+                        <div class="kpi-value" id="kpi-vencida-val">$0</div>
+                        <div class="kpi-footer">
+                            <span class="kpi-trend text-red" id="kpi-morosidad-percent">0.0% de morosidad</span>
+                        </div>
+                    </div>
+                    
+                    <div class="kpi-card" id="card-recuperacion">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Índice de Recuperación</span>
+                            <div class="kpi-icon icon-green">
+                                <i data-lucide="check-circle-2"></i>
+                            </div>
+                        </div>
+                        <div class="kpi-value" id="kpi-recuperacion-val">0.0%</div>
+                        <div class="kpi-footer">
+                            <span class="kpi-trend text-green">Eficiencia en cobros</span>
+                        </div>
+                    </div>
+                    
+                    <div class="kpi-card" id="card-rotacion">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Rotación de Cartera</span>
+                            <div class="kpi-icon icon-yellow">
+                                <i data-lucide="refresh-cw"></i>
+                            </div>
+                        </div>
+                        <div class="kpi-value" id="kpi-rotacion-val">0.0x</div>
+                        <div class="kpi-footer">
+                            <span class="kpi-trend text-neutral">Veces cobrada en el año</span>
+                        </div>
+                    </div>
+                    
+                    <div class="kpi-card" id="card-dso">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Días Promedio de Pago (DSO)</span>
+                            <div class="kpi-icon icon-purple">
+                                <i data-lucide="calendar"></i>
+                            </div>
+                        </div>
+                        <div class="kpi-value" id="kpi-dso-val">0 días</div>
+                        <div class="kpi-footer">
+                            <span class="kpi-trend text-neutral" id="kpi-cobro-real-val">Cobro real: 0 días</span>
+                        </div>
+                    </div>
+                    
+                    <div class="kpi-card" id="card-costo-mora">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Costo Financiero de Mora</span>
+                            <div class="kpi-icon icon-orange">
+                                <i data-lucide="trending-down"></i>
+                            </div>
+                        </div>
+                        <div class="kpi-value" id="kpi-costo-mora-val">$0</div>
+                        <div class="kpi-footer">
+                            <span class="kpi-trend text-orange">Pérdida de valor del dinero (12% ea)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Map Container (Fase 2) -->
+                <div class="map-card">
+                    <div class="map-header">
+                        <div class="map-title-info">
+                            <h3><i data-lucide="map-pin"></i> Distribución Geográfica de Cartera Internacional</h3>
+                            <p>Burbujas proporcionales al saldo pendiente de cobro en USD. Haz clic en una filial para filtrar el dashboard.</p>
+                        </div>
+                        <div class="map-legend">
+                            <div class="legend-item">
+                                <span class="legend-dot healthy"></span> <span>Mora &lt; 30%</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-dot warning"></span> <span>Mora 30% - 50%</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-dot danger"></span> <span>Mora &gt; 50%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="map-wrapper">
+                        <div id="map"></div>
+                    </div>
+                </div>
+                
+                <!-- Charts Grid -->
+                <div class="charts-grid">
+                    <div class="chart-container large">
+                        <div class="chart-header">
+                            <h3>Tramos de Antigüedad de Cartera (Mora)</h3>
+                            <p>Distribución de los saldos vencidos por días transcurridos</p>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="chart-mora"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3>Cartera por Sector Económico</h3>
+                            <p>Concentración de riesgo sectorial</p>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="chart-sectores"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- NUEVO: Clasificación de Riesgo Crediticio (Dona) -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3>Clasificación de Riesgo Crediticio</h3>
+                            <p>Distribución de saldos por categorías A-E</p>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="chart-riesgo"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- NUEVO: Resumen de Indicadores Clave por Filial -->
+                    <div class="chart-container large">
+                        <div class="chart-header">
+                            <h3>Monitoreo de Indicadores y Riesgo por Filial</h3>
+                            <p>Saldos de cartera general y tasa de morosidad por filial de ICONTEC</p>
+                        </div>
+                        <div class="chart-wrapper" style="overflow-y: auto; max-height: 250px; display: block;">
+                            <div class="filiales-risk-list" id="filiales-risk-list">
+                                <!-- Se llena dinámicamente con JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-container full-width">
+                        <div class="chart-header">
+                            <h3>Clientes con Mayor Cartera Vencida (Top 10 Críticos)</h3>
+                            <p>Entidades clave que requieren gestiones de cobro prioritarias</p>
+                        </div>
+                        <div class="chart-wrapper tall">
+                            <canvas id="chart-clientes"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Page: ETL Processor -->
+            <section class="tab-content" id="tab-etl">
+                <div class="etl-container">
+                    <div class="info-alert">
+                        <div class="info-icon">
+                            <i data-lucide="info"></i>
+                        </div>
+                        <div class="info-text">
+                            <h4>Estructuración para Power BI en un Clic</h4>
+                            <p>Esta herramienta procesa un archivo plano de facturas en Excel y genera automáticamente la estructura en <strong>Modelo Estrella</strong> (Tabla de hechos y dimensiones). Esto evita transformaciones de datos manuales y repetitivas.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="etl-actions-grid">
+                        <!-- Card: Upload -->
+                        <div class="action-card">
+                            <div class="action-card-header">
+                                <i data-lucide="upload-cloud" class="icon-upload"></i>
+                                <h3>Carga tu Cartera en Excel</h3>
+                                <p>Sube tu archivo .xlsx, .xls o .csv actual</p>
+                            </div>
+                            
+                            <div class="drag-drop-area" id="drag-drop-area">
+                                <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display: none;">
+                                <i data-lucide="file-spreadsheet" class="file-icon"></i>
+                                <p>Arrastra tu archivo aquí o <span class="highlight">búscalo en tu PC</span></p>
+                                <span class="file-limits">Formatos válidos: Excel (.xlsx, .xls) o CSV</span>
+                            </div>
+                            
+                            <div class="upload-progress-container" id="upload-progress" style="display: none;">
+                                <div class="spinner"></div>
+                                <p>Procesando y aplicando transformaciones ETL...</p>
+                            </div>
+                            
+                            <div id="upload-success-msg" class="success-banner" style="display: none;">
+                                <i data-lucide="check-circle"></i>
+                                <span>¡Archivo procesado con éxito! Tablas actualizadas.</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Card: Export -->
+                        <div class="action-card">
+                            <div class="action-card-header">
+                                <i data-lucide="download" class="icon-download"></i>
+                                <h3>Centro de Descargas</h3>
+                                <p>Exporta las tablas listas para conectar a Power BI</p>
+                            </div>
+                            
+                            <div class="export-preview-list">
+                                <div class="preview-item">
+                                    <div class="item-icon">
+                                        <i data-lucide="sheet"></i>
+                                    </div>
+                                    <div class="item-details">
+                                        <h4>ModeloEstrella_Cartera.xlsx</h4>
+                                        <p>Libro de Excel consolidado con 3 hojas: FactCartera, DimClientes y DimFechas.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button class="btn btn-primary btn-block" id="btn-export-excel">
+                                <i data-lucide="file-down"></i>
+                                <span>Descargar Modelo Estrella (Excel)</span>
+                            </button>
+                            
+                            <div class="template-download-section">
+                                <p>¿No tienes un archivo de cartera a la mano? Descarga el formato base y pruébalo.</p>
+                                <a href="/api/export/star-schema" class="template-link">
+                                    <i data-lucide="help-circle"></i> Descargar plantilla de ejemplo estructurada
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Star Schema Explanation -->
+                    <div class="schema-explanation">
+                        <h3>El Modelo Estrella que hemos diseñado para ti</h3>
+                        <p>Cuando importas estos datos a Power BI, no necesitarás hacer limpieza manual. Las tablas están estructuradas de la siguiente forma:</p>
+                        
+                        <div class="schema-cards">
+                            <div class="schema-card-item">
+                                <h4>📊 FactCartera (Tabla de Hechos)</h4>
+                                <ul>
+                                    <li><code>FacturaID</code>: Código identificador</li>
+                                    <li><code>ClienteID</code>: Clave de relación con clientes</li>
+                                    <li><code>FechaFacturaKey</code>: Relación con DimFechas</li>
+                                    <li><code>FechaVencimientoKey</code>: Relación con DimFechas</li>
+                                    <li><code>FechaPagoKey</code>: Relación con DimFechas</li>
+                                    <li><code>MontoFacturado</code>, <code>MontoRecaudado</code>, <code>Saldo</code></li>
+                                    <li><code>DiasMora</code> y <code>TramoMora</code></li>
+                                </ul>
+                            </div>
+                            <div class="schema-card-item">
+                                <h4>👤 DimClientes (Tabla Dimensión)</h4>
+                                <ul>
+                                    <li><code>ClienteID</code>: Clave única por cliente</li>
+                                    <li><code>ClienteNombre</code>: Razón Social</li>
+                                    <li><code>Sector</code>: Tipo de actividad</li>
+                                    <li><code>Region</code>: Ubicación (Girardot, Bogotá, etc.)</li>
+                                    <li><code>Riesgo</code>: Segmento (Bajo, Medio, Alto)</li>
+                                </ul>
+                            </div>
+                            <div class="schema-card-item">
+                                <h4>📅 DimFechas (Tabla Dimensión)</h4>
+                                <ul>
+                                    <li><code>DateKey</code>: Clave primaria de fecha</li>
+                                    <li><code>Fecha</code>: Fecha Calendario</li>
+                                    <li><code>Año</code>, <code>MesNum</code>, <code>MesNombre</code></li>
+                                    <li><code>Trimestre</code> y <code>DiaSemana</code></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Page: DAX & PBI Integration -->
+            <section class="tab-content" id="tab-dax">
+                <div class="dax-container">
+                    <div class="dax-intro">
+                        <h3>Guía de Integración e Implementación en Power BI</h3>
+                        <p>Sigue estas instrucciones para replicar esta misma lógica financiera en tu reporte de Microsoft Power BI.</p>
+                    </div>
+                    
+                    <div class="dax-steps">
+                        <!-- Step 1 -->
+                        <div class="dax-step-item">
+                            <div class="step-num">1</div>
+                            <div class="step-body">
+                                <h4>Importar y Relacionar las Tablas</h4>
+                                <p>Carga el archivo descargado <code>ModeloEstrella_Cartera.xlsx</code> en Power BI. En la pestaña de <strong>Modelo</strong> (Relaciones), arrastra las siguientes conexiones:</p>
+                                <div class="relation-box">
+                                    <p>🔗 <code>DimClientes[ClienteID]</code> <strong>1 ➔ *</strong> <code>FactCartera[ClienteID]</code></p>
+                                    <p>🔗 <code>DimFechas[DateKey]</code> <strong>1 ➔ *</strong> <code>FactCartera[FechaFacturaKey]</code> <span class="active-rel">(Activa)</span></p>
+                                    <p>🔗 <code>DimFechas[DateKey]</code> <strong>1 ➔ *</strong> <code>FactCartera[FechaVencimientoKey]</code> <span class="inactive-rel">(Inactiva)</span></p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 2 -->
+                        <div class="dax-step-item">
+                            <div class="step-num">2</div>
+                            <div class="step-body">
+                                <h4>Copiar las Medidas en DAX</h4>
+                                <p>Haz clic en cada indicador para copiar la fórmula DAX correspondiente y pegarla en tu reporte en Power BI.</p>
+                                
+                                <div class="dax-code-navigator">
+                                    <div class="dax-list">
+                                        <button class="dax-btn active" data-dax-id="dax-total">1. Cartera Total</button>
+                                        <button class="dax-btn" data-dax-id="dax-vencida">2. Cartera Vencida</button>
+                                        <button class="dax-btn" data-dax-id="dax-morosidad">3. Índice de Morosidad</button>
+                                        <button class="dax-btn" data-dax-id="dax-recuperacion">4. Índice de Recuperación</button>
+                                        <button class="dax-btn" data-dax-id="dax-rotacion">5. Rotación de Cartera</button>
+                                        <button class="dax-btn" data-dax-id="dax-dso">6. Días de Cobro (DSO)</button>
+                                        <button class="dax-btn" data-dax-id="dax-costo">7. Costo de Mora</button>
+                                    </div>
+                                    
+                                    <div class="dax-viewer">
+                                        <div class="viewer-header">
+                                            <span id="dax-selected-title">1. Cartera Total</span>
+                                            <button class="btn btn-copy" id="btn-copy-dax">
+                                                <i data-lucide="copy"></i> Copiar Código
+                                            </button>
+                                        </div>
+                                        <pre class="dax-pre"><code id="dax-code-block">Cartera Total = SUM(FactCartera[Saldo])</code></pre>
+                                        <div class="dax-desc-box">
+                                            <p id="dax-selected-desc">Suma todos los saldos por cobrar pendientes de pago. Es el valor total bruto de la cartera viva en la organización.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 3 -->
+                        <div class="dax-step-item">
+                            <div class="step-num">3</div>
+                            <div class="step-body">
+                                <h4>Recomendación de Diseño Visual para Laura</h4>
+                                <div class="design-tips">
+                                    <div class="tip-card">
+                                        <i data-lucide="palette"></i>
+                                        <h5>Paleta de Colores</h5>
+                                        <p>Usa tonos empresariales y sobrios. El azul oscuro (como el logo de ICONTEC) para la cartera general, gris para los tramos sanos, y rojo/naranja alerta para los tramos en mora crítica.</p>
+                                    </div>
+                                    <div class="tip-card">
+                                        <i data-lucide="layout"></i>
+                                        <h5>Estructura del Lienzo</h5>
+                                        <p>Ubica los 5 o 6 KPIs principales en la parte superior del tablero usando tarjetas de valor único. El gráfico de tramos de mora debe ser el visual central del reporte.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <!-- Contenedor del Reporte Ejecutivo PDF (Oculto en pantalla, formateado para PDF) -->
+    <div id="pdf-report-template" style="position: absolute; left: -9999px; top: -9999px; width: 800px; background: #ffffff; color: #1e293b; padding: 40px; font-family: 'Outfit', sans-serif; box-sizing: border-box;">
+        <!-- Cabecera -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 20px; margin-bottom: 30px;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <img src="/static/icontec_logo.png" style="max-height: 55px; object-fit: contain;">
+                <div>
+                    <h1 style="font-size: 20px; font-weight: 800; color: #0f172a; margin: 0; text-transform: uppercase; letter-spacing: -0.5px;">ICONTEC Internacional</h1>
+                    <p style="font-size: 11px; color: #64748b; margin: 2px 0 0 0; font-weight: 500;">Gestión e Indicadores de Cartera Filiales</p>
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <h2 style="font-size: 14px; font-weight: 700; color: #0284c7; margin: 0; text-transform: uppercase;">Reporte Financiero</h2>
+                <p style="font-size: 10px; color: #64748b; margin: 4px 0 0 0;" id="pdf-report-date"></p>
+            </div>
+        </div>
+
+        <!-- Filtros y Contexto -->
+        <div style="background: #f8fafc; border-radius: 8px; padding: 15px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 25px; border: 1px solid #e2e8f0; font-size: 12px; box-sizing: border-box;">
+            <div>
+                <strong>Filial / Región:</strong> <span id="pdf-context-filial" style="color: #0284c7; font-weight: 600;"></span>
+            </div>
+            <div>
+                <strong>Moneda:</strong> <span id="pdf-context-moneda" style="color: #0284c7; font-weight: 600;"></span>
+            </div>
+            <div>
+                <strong>Analista Responsable:</strong> <span style="font-weight: 600;">L. Valentina Ortiz R. (UPC)</span>
+            </div>
+            <div>
+                <strong>Estado de Datos:</strong> <span style="color: #10b981; font-weight: 600;">✓ Datos de Cartera En Línea</span>
+            </div>
+        </div>
+
+        <!-- KPIs Consolidados Grid -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 30px; box-sizing: border-box;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">Cartera Total</div>
+                <div style="font-size: 20px; font-weight: 800; color: #0f172a; margin-top: 5px;" id="pdf-kpi-total"></div>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">Cartera Vencida</div>
+                <div style="font-size: 20px; font-weight: 800; color: #ef4444; margin-top: 5px;" id="pdf-kpi-vencida"></div>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">Índice Morosidad</div>
+                <div style="font-size: 20px; font-weight: 800; color: #f59e0b; margin-top: 5px;" id="pdf-kpi-morosidad"></div>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">Índice Recuperación</div>
+                <div style="font-size: 20px; font-weight: 800; color: #10b981; margin-top: 5px;" id="pdf-kpi-recuperacion"></div>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">Rotación / DSO</div>
+                <div style="font-size: 20px; font-weight: 800; color: #0284c7; margin-top: 5px;" id="pdf-kpi-dso"></div>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">Costo Mora</div>
+                <div style="font-size: 20px; font-weight: 800; color: #ef4444; margin-top: 5px;" id="pdf-kpi-costo-mora"></div>
+            </div>
+        </div>
+
+        <!-- Secciones de Distribución de Riesgo y Resumen -->
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 30px; box-sizing: border-box;">
+            <div>
+                <h3 style="font-size: 13px; font-weight: 800; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-top: 0; color: #0f172a; text-transform: uppercase;">Clasificación de Riesgo Financiero</h3>
+                <div style="font-size: 11px; margin-top: 10px; display: flex; flex-direction: column; gap: 8px;" id="pdf-risk-breakdown">
+                    <!-- Se llena dinámicamente -->
+                </div>
+            </div>
+            <div>
+                <h3 style="font-size: 13px; font-weight: 800; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-top: 0; color: #0f172a; text-transform: uppercase;">Rendimiento de Filiales</h3>
+                <div style="font-size: 11px; margin-top: 10px; display: flex; flex-direction: column; gap: 8px;" id="pdf-filiales-breakdown">
+                    <!-- Se llena dinámicamente -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Clientes Críticos (Top 5) -->
+        <h3 style="font-size: 13px; font-weight: 800; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; color: #0f172a; text-transform: uppercase;">Entidades Críticas en Mora (Top 5 Críticos)</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; margin-bottom: 40px;">
+            <thead>
+                <tr style="background: #0f172a; color: #ffffff;">
+                    <th style="padding: 8px 10px; font-weight: 700; border-top-left-radius: 4px; border-bottom-left-radius: 4px;">Cliente / Entidad</th>
+                    <th style="padding: 8px 10px; font-weight: 700; text-align: right; border-top-right-radius: 4px; border-bottom-right-radius: 4px;">Saldo Vencido</th>
+                </tr>
+            </thead>
+            <tbody id="pdf-table-clientes-body">
+                <!-- Se llena dinámicamente -->
+            </tbody>
+        </table>
+
+        <!-- Firmas y Pie de Página -->
+        <div style="margin-top: 50px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 25px; font-size: 10px; color: #64748b;">
+            <div>
+                <strong>Elaborado por:</strong> L. Valentina Ortiz Rivera (Prácticas UPC)<br>
+                <strong>Institución:</strong> Universidad Piloto de Colombia
+            </div>
+            <div style="text-align: right; line-height: 1.5;">
+                Generado automáticamente por el Sistema Cartera ICONTEC<br>
+                Soporte de Decisiones Gerenciales e Indicadores de Filiales
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
