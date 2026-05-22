@@ -805,9 +805,7 @@ document.addEventListener("DOMContentLoaded", () => {
             
             const morosidad = ((kpis.cartera_vencida / kpis.cartera_total) * 100) || 0.0;
             document.getElementById("pdf-kpi-morosidad").textContent = `${morosidad.toFixed(1)}%`;
-            document.getElementById("pdf-kpi-recuperacion").textContent = `${kpis.indice_recuperacion}%`;
             document.getElementById("pdf-kpi-dso").textContent = `${kpis.dso} días`;
-            document.getElementById("pdf-kpi-costo-mora").textContent = formatActiveVal(kpis.costo_mora);
             
             // 3. Rellenar Clasificación de Riesgo
             const riskContainer = document.getElementById("pdf-risk-breakdown");
