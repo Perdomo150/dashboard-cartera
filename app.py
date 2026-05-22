@@ -9,8 +9,11 @@ app = Flask(__name__)
 
 # Configuración del directorio de trabajo
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-os.makedirs(DATA_DIR, exist_ok=True)
+if "VERCEL" in os.environ:
+    DATA_DIR = "/tmp"
+else:
+    DATA_DIR = os.path.join(BASE_DIR, "data")
+    os.makedirs(DATA_DIR, exist_ok=True)
 
 # Variables globales para persistencia en memoria durante la ejecución local
 CURRENT_DATA = None
