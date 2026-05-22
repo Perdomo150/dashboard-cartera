@@ -170,7 +170,7 @@ def generate_mock_data():
     return df
 
 def get_data():
-    """Obtiene el conjunto de datos de trabajo actual. Carga datos base por defecto."""
+    """Obtiene el conjunto de datos de trabajo actual. Inicia en vacío por requerimiento del usuario."""
     global CURRENT_DATA
     if CURRENT_DATA is not None:
         return CURRENT_DATA
@@ -180,18 +180,14 @@ def get_data():
         CURRENT_DATA = real_data
         return CURRENT_DATA
         
-    # Intentar leer cartera_base.csv local/persistida
-    base_file = os.path.join(DATA_DIR, "cartera_base.csv")
-    if os.path.exists(base_file):
-        try:
-            CURRENT_DATA = pd.read_csv(base_file, encoding="utf-8")
-            return CURRENT_DATA
-        except Exception:
-            pass
-            
-    # Si no hay datos, generar datos de demostración automáticos (Ideal para Vercel)
-    CURRENT_DATA = generate_mock_data()
-    return CURRENT_DATA
+    # Iniciar vacío por defecto para forzar la carga inicial de datos en el tab ETL
+    cols = [
+        "FacturaID", "ClienteID", "ClienteNombre", "Sector", "Region", "Riesgo", 
+        "FechaFactura", "FechaVencimiento", "FechaPago", "MontoFacturado", 
+        "MontoRecaudado", "Saldo", "TasaCostoOportunidad", "VentasCredito",
+        "UnidadNegocio", "Moneda", "DiasMora"
+    ]
+    return pd.DataFrame(columns=cols)
 
 def get_filtered_data():
     """Retorna el DataFrame activo filtrado de acuerdo con los dropdowns del dashboard."""
@@ -317,6 +313,17 @@ def process_etl(df):
 
 def calculate_metrics(df):
     """Calcula los 6 KPIs financieros en base al dataframe de trabajo."""
+    if df.empty:
+        return {
+            "cartera_total": 0.0,
+            "cartera_vencida": 0.0,
+            "indice_recuperacion": 0.0,
+            "rotacion_cartera": 0.0,
+            "dso": 0.0,
+            "dias_cobro_reales": 0.0,
+            "costo_mora": 0.0
+        }
+        
     fact_cartera, dim_clientes, dim_fechas = process_etl(df)
     
     cartera_total = float(fact_cartera["Saldo"].sum())
@@ -357,6 +364,9 @@ def home():
 def get_filter_options():
     """Retorna las opciones disponibles de Filial y Moneda en el DataFrame actual."""
     df = get_data().copy()
+    if df.empty:
+        return jsonify({"filiales": [], "monedas": []})
+        
     if "UnidadNegocio" not in df.columns and "Region" in df.columns:
         df["UnidadNegocio"] = df["Region"]
     if "Moneda" not in df.columns:
@@ -374,6 +384,8 @@ def get_filter_options():
 def get_map_filiales():
     """Retorna métricas consolidadas por filial para el mapa de Leaflet."""
     df = get_data().copy()
+    if df.empty:
+        return jsonify([])
     
     # Filtrar solo por moneda si se solicita, pero dejar ver todas las filiales
     moneda = request.args.get("moneda", "").strip()
@@ -425,8 +437,10 @@ def get_kpis():
 def get_chart_mora():
     """Agregación de mora filtrada por tramos."""
     df = get_filtered_data()
+    if df.empty:
+        return jsonify({"labels": ["Al día", "1 - 30 días", "31 - 60 días", "61 - 90 días", "Más de 90 días"], "values": [0]*5})
+        
     fact_cartera, _, _ = process_etl(df)
-    
     mora_agg = fact_cartera.groupby("TramoMora")["Saldo"].sum().reset_index()
     
     order = ["Al día", "1 - 30 días", "31 - 60 días", "61 - 90 días", "Más de 90 días"]
@@ -442,6 +456,9 @@ def get_chart_mora():
 def get_chart_clientes():
     """Retorna top 10 clientes críticos filtrados."""
     df = get_filtered_data()
+    if df.empty:
+        return jsonify({"labels": [], "values": []})
+        
     fact_cartera, dim_clientes, _ = process_etl(df)
     
     merged = pd.merge(fact_cartera, dim_clientes, on="ClienteID")
@@ -457,6 +474,9 @@ def get_chart_clientes():
 def get_chart_sectores():
     """Agregación sectorial filtrada."""
     df = get_filtered_data()
+    if df.empty:
+        return jsonify({"labels": [], "values": []})
+        
     fact_cartera, dim_clientes, _ = process_etl(df)
     
     merged = pd.merge(fact_cartera, dim_clientes, on="ClienteID")
