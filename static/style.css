@@ -1192,6 +1192,8 @@ body {
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     box-shadow: var(--glass-shadow);
+    position: relative;
+    z-index: 100;
 }
 
 .filter-item {
@@ -1489,5 +1491,130 @@ body {
     background: var(--accent-blue);
     color: white;
     box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+}
+
+/* ------------------------------------- */
+/* CUSTOM MULTISELECT UI                 */
+/* ------------------------------------- */
+.custom-multiselect-wrapper {
+    position: relative;
+    min-width: 220px;
+    max-width: 360px;
+    font-family: 'Outfit', sans-serif;
+    margin-top: 0.3rem;
+}
+
+.custom-multiselect-wrapper.open {
+    z-index: 100;
+}
+
+.custom-multiselect-display {
+    background: rgba(11, 15, 25, 0.85);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--border-radius-md);
+    padding: 0.3rem 2rem 0.3rem 0.5rem;
+    min-height: 40px;
+    cursor: pointer;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    align-items: center;
+    transition: all 0.3s ease;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem;
+}
+
+.custom-multiselect-display:hover, .custom-multiselect-wrapper.open .custom-multiselect-display {
+    border-color: rgba(255, 255, 255, 0.2);
+    background-color: rgba(11, 15, 25, 0.95);
+}
+.custom-multiselect-wrapper.open .custom-multiselect-display {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+}
+
+.multiselect-tag {
+    background: rgba(14, 165, 233, 0.15);
+    color: var(--accent-blue);
+    border: 1px solid rgba(14, 165, 233, 0.3);
+    border-radius: 6px;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.multiselect-tag .remove-tag {
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--accent-blue);
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+.multiselect-tag .remove-tag:hover {
+    opacity: 1;
+    color: #fff;
+}
+
+.multiselect-placeholder {
+    color: var(--text-main);
+    font-size: 0.88rem;
+    padding-left: 0.4rem;
+    font-weight: 500;
+}
+
+.multiselect-dropdown {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    width: 100%;
+    background: rgba(11, 15, 25, 0.95);
+    border: 1px solid rgba(255,255,255, 0.1);
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 9999;
+    max-height: 250px;
+    overflow-y: auto;
+    display: none;
+    flex-direction: column;
+    padding: 0.3rem 0;
+}
+
+.custom-multiselect-wrapper.open .multiselect-dropdown {
+    display: flex;
+}
+
+.multiselect-option {
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+    color: var(--text-main);
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.multiselect-option:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.multiselect-option.selected {
+    background: rgba(14, 165, 233, 0.1);
+    color: var(--accent-blue);
+    font-weight: 600;
+}
+.multiselect-option.selected::after {
+    content: "✓";
+    font-size: 0.9rem;
+    color: var(--accent-blue);
 }
 

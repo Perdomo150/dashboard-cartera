@@ -116,6 +116,34 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
     
+    // ── Conversión de Moneda ──────────────────────────────────────────────────
+    // Tasas de cambio activas (Moneda Local / USD) obtenidas del backend
+    let currentRates = { 'USD': 1.0 };
+    
+    // Cache de todas las monedas disponibles (para restaurar al deseleccionar filial)
+    let allMonedaOptions = [];
+    
+    // Mapa filial → código de moneda local oficial
+    const FILIAL_MONEDA_MAP = {
+        'BU_IC_PERU':      'PEN',  // Sol peruano
+        'BU_IC_MEXICO':    'MXN',  // Peso mexicano
+        'BU_IC_CHILE':     'CLP',  // Peso chileno
+        'BU_IC_ECUADOR':   'USD',  // Ecuador ya usa USD
+        'BU_IC_SALVADOR':  'USD',  // El Salvador ya usa USD
+        'BU_IC_GUATEMALA': 'GTQ',  // Quetzal guatemalteco
+        'BU_IC_HONDURAS':  'HNL'   // Lempira hondureño
+    };
+    
+    const CURRENCY_LABELS = {
+        'USD': 'USD — Dólar Estadounidense',
+        'PEN': 'PEN — Sol Peruano',
+        'MXN': 'MXN — Peso Mexicano',
+        'CLP': 'CLP — Peso Chileno',
+        'GTQ': 'GTQ — Quetzal Guatemalteco',
+        'HNL': 'HNL — Lempira Hondureño'
+    };
+    // ────────────────────────────────────────────────────────────────────
+
     // 4. Formateadores Financieros Flexibles
     const formatCurrency = (value, currency = "USD") => {
         const loc = (currency === "COP" || currency === "COP$") ? "es-CO" : "en-US";
@@ -130,8 +158,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const formatActiveVal = (value) => {
         const mSelect = document.getElementById("filter-moneda");
         const currency = mSelect ? mSelect.value : "USD";
-        const displayCurr = (currency === "Todos") ? "USD" : currency;
-        return formatCurrency(value, displayCurr);
+        const displayCurr = (currency === "Todos" || !currency) ? "USD" : currency;
+        // Aplicar tasa de conversión: todos los valores del backend llegan en USD
+        const rate = currentRates[displayCurr] || 1.0;
+        return formatCurrency(value * rate, displayCurr);
     };
     
     // 5. Inicialización de Gráficos (Chart.js)
@@ -372,7 +402,9 @@ document.addEventListener("DOMContentLoaded", () => {
     window.filterFromMap = (filialId) => {
         const fSelect = document.getElementById("filter-filial");
         if (fSelect) {
-            fSelect.value = filialId;
+            Array.from(fSelect.options).forEach(opt => opt.selected = false);
+            const targetOpt = Array.from(fSelect.options).find(opt => opt.value === filialId);
+            if (targetOpt) targetOpt.selected = true;
             fSelect.dispatchEvent(new Event("change"));
         }
     };
@@ -381,7 +413,13 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!map) return;
         try {
             const activeMoneda = document.getElementById("filter-moneda").value;
-            const activeFilial = document.getElementById("filter-filial").value;
+            const fSelect = document.getElementById("filter-filial");
+            const activeFiliales = Array.from(fSelect.selectedOptions).map(o => o.value);
+            
+            // Si hay múltiples filiales seleccionadas, se procesarán en el mapa. 
+            // Para el parámetro filial del mapa usaremos la primera o "Todos" si hay varias.
+            // (El endpoint de mapa no filtra por filial, devuelve todas, el filtro es visual).
+            const mapActiveFilial = (activeFiliales.includes("Todos") || activeFiliales.length === 0) ? "Todos" : activeFiliales.join(",");
             
             // Consultar coordenadas y saldos consolidados
             const res = await fetch(`/api/map/filiales?moneda=${activeMoneda}`);
@@ -404,8 +442,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     color = "#f59e0b"; // Alerta
                 }
                 
-                // Resaltar visualmente si esta filial está seleccionada individualmente
-                let isSelected = (f.id === activeFilial);
+                // Resaltar visualmente si esta filial está seleccionada (aplica también a selección múltiple)
+                let isSelected = activeFiliales.includes(f.id);
                 let weight = isSelected ? 4 : 1.5;
                 let dashArray = isSelected ? "4,4" : "";
                 if (isSelected) {
@@ -462,9 +500,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 markersLayer.addLayer(marker);
             });
             
-            // Autoenfocar si hay filtros individuales seleccionados
-            if (activeFilial !== "Todos" && data.length > 0) {
-                const selected = data.find(f => f.id === activeFilial);
+            // Autoenfocar si hay filtros individuales seleccionados y es uno solo
+            if (!activeFiliales.includes("Todos") && activeFiliales.length === 1 && data.length > 0) {
+                const selected = data.find(f => f.id === activeFiliales[0]);
                 if (selected && selected.lat !== 0) {
                     map.setView([selected.lat, selected.lng], 5);
                 }
@@ -546,10 +584,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // 7. Cargar Datos y Actualizar Dashboard
     const fetchDashboardData = async () => {
         try {
-            const activeFilial = document.getElementById("filter-filial").value;
+            const fSelect = document.getElementById("filter-filial");
+            const rawFiliales = Array.from(fSelect.selectedOptions).map(o => o.value);
+            const activeFiliales = (rawFiliales.length === 0 || rawFiliales.includes("Todos")) ? ["Todos"] : rawFiliales;
             const activeMoneda = document.getElementById("filter-moneda").value;
             
-            const queryParams = `?filial=${activeFilial}&moneda=${activeMoneda}`;
+            // Cuando hay múltiples filiales específicas, el backend recibe moneda=Todos
+            // para no excluir filas. El dropdown de moneda se fuerza a USD visualmente.
+            const backendMoneda = (activeFiliales[0] !== "Todos" && activeFiliales.length > 0) ? "Todos" : activeMoneda;
+            const queryParams = `?filial=${activeFiliales.join(",")}&moneda=${backendMoneda}`;
             
             // A. Obtener KPIs consolidados y filtrados
             const kpiRes = await fetch(`/api/kpis${queryParams}`);
@@ -592,6 +635,119 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
     
+    // --- Custom Multi-Select UI Logic ---
+    const initCustomMultiselect = () => {
+        const nativeSelect = document.getElementById("filter-filial");
+        const container = document.getElementById("custom-filial-container");
+        if (!nativeSelect || !container) return;
+        
+        // Evitar duplicación de listeners si ya existe el wrapper
+        let wrapper = container.querySelector(".custom-multiselect-wrapper");
+        if (!wrapper) {
+            wrapper = document.createElement("div");
+            wrapper.className = "custom-multiselect-wrapper";
+            container.appendChild(wrapper);
+            
+            let display = document.createElement("div");
+            display.className = "custom-multiselect-display";
+            wrapper.appendChild(display);
+            
+            display.addEventListener("click", (e) => {
+                if (e.target.closest(".remove-tag")) return; 
+                wrapper.classList.toggle("open");
+            });
+            
+            document.addEventListener("click", (e) => {
+                if (!wrapper.contains(e.target)) wrapper.classList.remove("open");
+            });
+            
+            let dropdown = document.createElement("div");
+            dropdown.className = "multiselect-dropdown";
+            wrapper.appendChild(dropdown);
+            
+            // Función de actualización que reconstruye visualmente en base al nativo
+            const updateUI = () => {
+                display.innerHTML = "";
+                dropdown.innerHTML = "";
+                
+                const selectedOptions = Array.from(nativeSelect.selectedOptions);
+                const allOptions = Array.from(nativeSelect.options);
+                
+                // Tags
+                if (selectedOptions.length === 0 || (selectedOptions.length === 1 && selectedOptions[0].value === "Todos")) {
+                    display.innerHTML = `<span class="multiselect-placeholder">Todas las Filiales (Global)</span>`;
+                } else {
+                    selectedOptions.forEach(opt => {
+                        if (opt.value === "Todos") return;
+                        const tag = document.createElement("span");
+                        tag.className = "multiselect-tag";
+                        tag.innerHTML = `${opt.text} <span class="remove-tag" data-val="${opt.value}">×</span>`;
+                        display.appendChild(tag);
+                    });
+                }
+                
+                // Dropdown Options
+                allOptions.forEach(opt => {
+                    const isSelected = opt.selected;
+                    const div = document.createElement("div");
+                    div.className = `multiselect-option ${isSelected ? 'selected' : ''}`;
+                    div.textContent = opt.text;
+                    div.dataset.val = opt.value;
+                    
+                    div.addEventListener("click", () => {
+                        if (opt.value === "Todos") {
+                            allOptions.forEach(o => o.selected = false);
+                            opt.selected = true;
+                        } else {
+                            opt.selected = !opt.selected;
+                            const todosOpt = allOptions.find(o => o.value === "Todos");
+                            if (todosOpt && opt.selected) todosOpt.selected = false;
+                        }
+                        
+                        if (Array.from(nativeSelect.selectedOptions).length === 0) {
+                            const todosOpt = allOptions.find(o => o.value === "Todos");
+                            if (todosOpt) todosOpt.selected = true;
+                        }
+                        
+                        nativeSelect.dispatchEvent(new Event("change"));
+                        updateUI();
+                    });
+                    dropdown.appendChild(div);
+                });
+                
+                // Events for removing tags
+                display.querySelectorAll(".remove-tag").forEach(btn => {
+                    btn.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        const val = btn.dataset.val;
+                        const opt = allOptions.find(o => o.value === val);
+                        if (opt) opt.selected = false;
+                        
+                        if (Array.from(nativeSelect.selectedOptions).length === 0) {
+                            const todosOpt = allOptions.find(o => o.value === "Todos");
+                            if (todosOpt) todosOpt.selected = true;
+                        }
+                        
+                        nativeSelect.dispatchEvent(new Event("change"));
+                        updateUI();
+                    });
+                });
+            };
+            
+            // Sync initial state
+            updateUI();
+            
+            // Listen to external native changes (like reset button or map click)
+            nativeSelect.addEventListener("change", () => {
+                // Pequeño timeout para dejar que otros listeners se ejecuten si es necesario
+                setTimeout(updateUI, 10);
+            });
+        } else {
+            // Si el wrapper ya existe, solo disparamos change para forzar el updateUI()
+            nativeSelect.dispatchEvent(new Event("change"));
+        }
+    };
+    
     // 8. Opciones de Filtro Autocompletadas desde Backend
     const loadFilterOptions = async () => {
         try {
@@ -601,8 +757,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const fSelect = document.getElementById("filter-filial");
             const mSelect = document.getElementById("filter-moneda");
             
-            // Preservar valores seleccionados si existen
-            const prevFilial = fSelect.value;
+            // Preservar valores seleccionados si existen (para multiselect)
+            const prevFiliales = Array.from(fSelect.selectedOptions).map(o => o.value);
             const prevMoneda = mSelect.value;
             
             fSelect.innerHTML = `<option value="Todos">Todas las Filiales (Global)</option>`;
@@ -625,12 +781,64 @@ document.addEventListener("DOMContentLoaded", () => {
                 mSelect.innerHTML += `<option value="${m}">${m}</option>`;
             });
             
+            // Cachear todas las monedas disponibles (para restaurar al volver a "Todas las Filiales")
+            allMonedaOptions = data.monedas;
+            
             // Intentar restaurar valores previos si siguen existiendo
-            if (Array.from(fSelect.options).some(o => o.value === prevFilial)) fSelect.value = prevFilial;
+            Array.from(fSelect.options).forEach(opt => {
+                if (prevFiliales.includes(opt.value)) opt.selected = true;
+            });
+            if (fSelect.selectedOptions.length === 0) fSelect.value = "Todos";
             if (Array.from(mSelect.options).some(o => o.value === prevMoneda)) mSelect.value = prevMoneda;
+            
+            // Inicializar o actualizar custom dropdown
+            initCustomMultiselect();
             
         } catch (error) {
             console.error("Error cargando configuraciones de filtros dinámicos:", error);
+        }
+    };
+    
+    // Carga las tasas de cambio implícitas calculadas por el backend
+    const loadCurrencyRates = async () => {
+        try {
+            const res = await fetch("/api/currency/rates");
+            const data = await res.json();
+            currentRates = { 'USD': 1.0, ...data };
+            console.log("[Tasas] Cargadas desde backend:", currentRates);
+        } catch (e) {
+            console.error("Error cargando tasas de cambio:", e);
+            currentRates = { 'USD': 1.0 };
+        }
+    };
+    
+    // Restringe el dropdown de Moneda según la(s) filial(es) seleccionada(s)
+    const restrictMonedaByFilial = (filialesArr) => {
+        const mSelect = document.getElementById("filter-moneda");
+        if (!mSelect) return;
+        
+        if (filialesArr.length === 0 || filialesArr.includes("Todos") || filialesArr.length > 1) {
+            // Restaurar todas las monedas disponibles si hay > 1 filial o "Todos"
+            mSelect.innerHTML = `<option value="Todos">Todas las Monedas (Muestra USD)</option>`;
+            allMonedaOptions.forEach(m => {
+                mSelect.innerHTML += `<option value="${m}">${m}</option>`;
+            });
+            mSelect.value = "Todos";
+            return;
+        }
+        
+        const filialId = filialesArr[0];
+        const localCurrency = FILIAL_MONEDA_MAP[filialId] || null;
+        
+        // Solo mostrar USD y la moneda local de la filial
+        mSelect.innerHTML = `<option value="USD">${CURRENCY_LABELS['USD']}</option>`;
+        
+        if (localCurrency && localCurrency !== "USD") {
+            const label = CURRENCY_LABELS[localCurrency] || localCurrency;
+            mSelect.innerHTML += `<option value="${localCurrency}">${label}</option>`;
+            mSelect.value = localCurrency;  // Auto-seleccionar moneda local
+        } else {
+            mSelect.value = "USD";
         }
     };
     
@@ -639,19 +847,32 @@ document.addEventListener("DOMContentLoaded", () => {
     
     const initializeDashboard = async () => {
         await loadFilterOptions();
+        await loadCurrencyRates();
         await fetchDashboardData();
     };
     
     initializeDashboard();
     
     // Escuchar cambios en los dropdowns
-    document.getElementById("filter-filial").addEventListener("change", fetchDashboardData);
+    document.getElementById("filter-filial").addEventListener("change", (e) => {
+        const fSelect = document.getElementById("filter-filial");
+        // Si el usuario selecciona "Todos", quitar las demás selecciones para evitar confusión
+        let selected = Array.from(fSelect.selectedOptions).map(o => o.value);
+        if (selected.includes("Todos") && selected.length > 1) {
+            Array.from(fSelect.options).forEach(opt => opt.selected = (opt.value === "Todos"));
+            selected = ["Todos"];
+        }
+        
+        restrictMonedaByFilial(selected);  // RF-01: restringir monedas
+        fetchDashboardData();
+    });
     document.getElementById("filter-moneda").addEventListener("change", fetchDashboardData);
     
     // Botón para limpiar filtros
     document.getElementById("btn-clear-filters").addEventListener("click", () => {
-        document.getElementById("filter-filial").value = "Todos";
-        document.getElementById("filter-moneda").value = "Todos";
+        const fSelect = document.getElementById("filter-filial");
+        Array.from(fSelect.options).forEach(opt => opt.selected = (opt.value === "Todos"));
+        restrictMonedaByFilial(["Todos"]);  // Restaurar todas las monedas
         fetchDashboardData();
     });
     
@@ -770,9 +991,13 @@ document.addEventListener("DOMContentLoaded", () => {
             btnExportPDF.innerHTML = `<i data-lucide="loader" class="spin" style="animation: spin 1s linear infinite;"></i> <span>Generando...</span>`;
             lucide.createIcons();
             
-            const activeFilial = document.getElementById("filter-filial").value;
+            const fSelect = document.getElementById("filter-filial");
+            const rawFiliales = Array.from(fSelect.selectedOptions).map(o => o.value);
+            const activeFiliales = (rawFiliales.length === 0 || rawFiliales.includes("Todos")) ? ["Todos"] : rawFiliales;
             const activeMoneda = document.getElementById("filter-moneda").value;
-            const queryParams = `?filial=${activeFilial}&moneda=${activeMoneda}`;
+            
+            const backendMoneda = (activeFiliales[0] !== "Todos" && activeFiliales.length > 0) ? "Todos" : activeMoneda;
+            const queryParams = `?filial=${activeFiliales.join(",")}&moneda=${backendMoneda}`;
             
             // Obtener datos consolidados para el PDF
             const [kpiRes, riskRes, clientRes, filRes] = await Promise.all([
@@ -788,8 +1013,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const filData = await filRes.json();
             
             // Nombre descriptivo de la filial
-            const fSelect = document.getElementById("filter-filial");
-            const displayNameFilial = fSelect.options[fSelect.selectedIndex].text;
+            const displayNameFilial = Array.from(fSelect.selectedOptions).map(o => o.text).join(", ");
             
             const mSelect = document.getElementById("filter-moneda");
             const displayNameMoneda = mSelect.options[mSelect.selectedIndex].text;

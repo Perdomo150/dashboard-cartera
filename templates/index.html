@@ -78,10 +78,11 @@
                 <!-- Dynamic Filters Bar -->
                 <div class="filters-bar">
                     <div class="filter-item">
-                        <label for="filter-filial"><i data-lucide="globe"></i> Filial / País</label>
-                        <select id="filter-filial" class="filter-select">
-                            <option value="Todos">Todas las Filiales (Global)</option>
+                        <label for="filter-filial" style="display: block; margin-bottom: 0.25rem;"><i data-lucide="globe"></i> Filiales</label>
+                        <select id="filter-filial" multiple style="display: none;">
+                            <option value="Todos" selected>Todas las Filiales (Global)</option>
                         </select>
+                        <div id="custom-filial-container"></div>
                     </div>
                     <div class="filter-item">
                         <label for="filter-moneda"><i data-lucide="coins"></i> Moneda</label>

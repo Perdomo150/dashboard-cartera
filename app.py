@@ -17,6 +17,7 @@ else:
 
 # Variables globales para persistencia en memoria durante la ejecución local
 CURRENT_DATA = None
+CURRENCY_RATES = {}  # Tasas promedio ponderadas (Moneda Local / USD) derivadas del dataset activo
 
 # Coordenadas geográficas para mapa internacional (Filiales reales e ICONTEC/Cyrgo)
 FILIAL_COORDINATES = {
@@ -178,16 +179,53 @@ def get_data():
     real_data = load_and_parse_real_excel()
     if real_data is not None:
         CURRENT_DATA = real_data
+        compute_and_store_rates(real_data)
         return CURRENT_DATA
         
     # Iniciar vacío por defecto para forzar la carga inicial de datos en el tab ETL
     cols = [
         "FacturaID", "ClienteID", "ClienteNombre", "Sector", "Region", "Riesgo", 
         "FechaFactura", "FechaVencimiento", "FechaPago", "MontoFacturado", 
-        "MontoRecaudado", "Saldo", "TasaCostoOportunidad", "VentasCredito",
+        "MontoRecaudado", "Saldo", "SaldoLocal", "TasaCostoOportunidad", "VentasCredito",
         "UnidadNegocio", "Moneda", "DiasMora"
     ]
     return pd.DataFrame(columns=cols)
+
+def compute_and_store_rates(df):
+    """Calcula la tasa de cambio promedio ponderada (Moneda Local / USD) por divisa.
+    
+    Metodología: tasa implícita = SUM(SaldoLocal) / SUM(Saldo en USD)
+    Solo usa filas donde ambos saldos son > 0 para evitar divisiones por cero.
+    Almacena el resultado en la variable global CURRENCY_RATES.
+    
+    NOTA: Esta es una tasa implícita derivada de los datos del Excel de cartera.
+    Puede reemplazarse por una fuente externa (API o tabla fija) sin cambiar el resto del código.
+    """
+    global CURRENCY_RATES
+    CURRENCY_RATES = {}
+    if df is None or df.empty:
+        return
+    if "SaldoLocal" not in df.columns or "Moneda" not in df.columns or "Saldo" not in df.columns:
+        return
+    
+    df_calc = df.copy()
+    df_calc["Saldo"] = pd.to_numeric(df_calc["Saldo"], errors="coerce").fillna(0.0)
+    df_calc["SaldoLocal"] = pd.to_numeric(df_calc["SaldoLocal"], errors="coerce").fillna(0.0)
+    
+    for moneda, group in df_calc.groupby("Moneda"):
+        if moneda == "USD":
+            CURRENCY_RATES["USD"] = 1.0
+            continue
+        # Solo filas con ambos saldos > 0 para calcular la tasa
+        valid = group[(group["Saldo"] > 0) & (group["SaldoLocal"] > 0)]
+        if len(valid) > 0:
+            total_usd = valid["Saldo"].sum()
+            total_local = valid["SaldoLocal"].sum()
+            if total_usd > 0:
+                rate = round(float(total_local / total_usd), 6)
+                CURRENCY_RATES[moneda] = rate
+                print(f"[Tasas] {moneda}/USD calculada: {rate:,.4f} ({len(valid)} facturas válidas)")
+
 
 def get_filtered_data():
     """Retorna el DataFrame activo filtrado de acuerdo con los dropdowns del dashboard."""
@@ -202,7 +240,9 @@ def get_filtered_data():
     # Filtro por Filial (Unidad de Negocio)
     filial = request.args.get("filial", "").strip()
     if filial and filial != "Todos":
-        df = df[df["UnidadNegocio"] == filial]
+        filiales_list = [f.strip() for f in filial.split(",") if f.strip()]
+        if filiales_list and "Todos" not in filiales_list:
+            df = df[df["UnidadNegocio"].isin(filiales_list)]
         
     # Filtro por Moneda
     moneda = request.args.get("moneda", "").strip()
@@ -589,6 +629,7 @@ def upload_file():
             # Saldo en Dólares
             homologated["Saldo"] = pd.to_numeric(df["SALDO PENDIENTE EN DOLARES"], errors="coerce").fillna(0.0)
             saldo_local = pd.to_numeric(df["SALDO PENDIENTE MONEDA LOCAL"], errors="coerce").fillna(0.0)
+            homologated["SaldoLocal"] = saldo_local  # Preservado para calcular tasas de cambio implícitas
             monto_original_local = pd.to_numeric(df["MONTO ORIGINAL"], errors="coerce").fillna(0.0)
             
             # Replicar el cálculo de MontoFacturado USD exacto de load_and_parse_real_excel
@@ -682,7 +723,7 @@ def upload_file():
             if missing:
                 return jsonify({"error": f"Columnas faltantes en el archivo: {', '.join(missing)}"}), 400
                 
-        # Mantener solo columnas del modelo y preservar DiasMora si existe
+        # Mantener solo columnas del modelo; preservar DiasMora y SaldoLocal si existen
         cols_to_keep = [
             "FacturaID", "ClienteID", "ClienteNombre", "Sector", "Region", "Riesgo", 
             "FechaFactura", "FechaVencimiento", "FechaPago", "MontoFacturado", 
@@ -691,11 +732,14 @@ def upload_file():
         ]
         if "DiasMora" in df.columns:
             cols_to_keep.append("DiasMora")
+        if "SaldoLocal" in df.columns:
+            cols_to_keep.append("SaldoLocal")
             
         df = df[cols_to_keep]
             
         df.to_csv(os.path.join(DATA_DIR, "cartera_base.csv"), index=False, encoding="utf-8")
         CURRENT_DATA = df
+        compute_and_store_rates(df)  # Calcular tasas de cambio implícitas del dataset recién cargado
         
         return jsonify({"success": True, "message": "Datos de cartera internacional actualizados con éxito."})
         
@@ -720,6 +764,17 @@ def export_star_schema():
     response.headers['Content-Type'] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     
     return response
+
+@app.route("/api/currency/rates")
+def get_currency_rates():
+    """Retorna las tasas de cambio calculadas del dataset activo (Moneda Local / USD).
+    
+    Ejemplo de respuesta: {"PEN": 3.72, "MXN": 17.15, "CLP": 948.0, "USD": 1.0}
+    Si no hay datos cargados o no hay columna SaldoLocal, retorna solo {"USD": 1.0}.
+    """
+    rates = {"USD": 1.0, **CURRENCY_RATES}
+    return jsonify(rates)
+
 
 @app.route("/api/reset")
 def reset_data():
