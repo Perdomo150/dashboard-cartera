@@ -1022,9 +1022,11 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // 10. Botón Descargar Modelo Estrella
     const btnExport = document.getElementById("btn-export-excel");
-    btnExport.addEventListener("click", () => {
-        window.location.href = "/api/export/star-schema";
-    });
+    if (btnExport) {
+        btnExport.addEventListener("click", () => {
+            window.location.href = "/api/export/star-schema";
+        });
+    }
 
     // 11. Botón Exportar Reporte Ejecutivo PDF
     const btnExportPDF = document.getElementById("btn-export-pdf");
