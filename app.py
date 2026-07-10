@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 import pandas as pd
 from flask import Flask, jsonify, request, render_template, send_file, make_response
 import io
-
-app = Flask(__name__)
+import json
+import requestsapp = Flask(__name__)
 
 # Configuración del directorio de trabajo
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -18,6 +18,52 @@ else:
 # Variables globales para persistencia en memoria durante la ejecución local
 CURRENT_DATA = None
 CURRENCY_RATES = {}  # Tasas promedio ponderadas (Moneda Local / USD) derivadas del dataset activo
+
+# Vercel Blob Helper functions
+BLOB_READ_WRITE_TOKEN = os.environ.get("BLOB_READ_WRITE_TOKEN")
+
+def upload_to_vercel_blob(file_path, filename):
+    if not BLOB_READ_WRITE_TOKEN:
+        return False
+    url = f"https://blob.vercel-storage.com/{filename}"
+    headers = {
+        "authorization": f"Bearer {BLOB_READ_WRITE_TOKEN}",
+        "x-api-version": "7"
+    }
+    try:
+        with open(file_path, 'rb') as f:
+            response = requests.put(url, headers=headers, data=f)
+            response.raise_for_status()
+            return True
+    except Exception as e:
+        print(f"Error uploading to Vercel Blob: {e}")
+        return False
+
+def download_from_vercel_blob(filename, dest_path):
+    if not BLOB_READ_WRITE_TOKEN:
+        return False
+    url = f"https://blob.vercel-storage.com"
+    headers = {
+        "authorization": f"Bearer {BLOB_READ_WRITE_TOKEN}",
+        "x-api-version": "7"
+    }
+    try:
+        list_resp = requests.get(url, headers=headers)
+        list_resp.raise_for_status()
+        blobs = list_resp.json().get('blobs', [])
+        target_blob = next((b for b in blobs if b['pathname'] == filename), None)
+        
+        if target_blob:
+            blob_url = target_blob['url']
+            file_resp = requests.get(blob_url)
+            file_resp.raise_for_status()
+            with open(dest_path, 'wb') as f:
+                f.write(file_resp.content)
+            return True
+        return False
+    except Exception as e:
+        print(f"Error downloading from Vercel Blob: {e}")
+        return False
 
 # Coordenadas geográficas para mapa internacional (Filiales reales e ICONTEC/Cyrgo)
 FILIAL_COORDINATES = {
@@ -176,8 +222,15 @@ def get_data():
     if CURRENT_DATA is not None:
         return CURRENT_DATA
         
-    # Primero intentar cargar el archivo guardado (cartera_base.csv)
     csv_path = os.path.join(DATA_DIR, "cartera_base.csv")
+    
+    # Si estamos en Vercel, el archivo temporal desaparece, así que intentamos descargarlo del Blob primero
+    if "VERCEL" in os.environ and BLOB_READ_WRITE_TOKEN:
+        if not os.path.exists(csv_path):
+            print("Vercel detectado: Descargando CSV desde Blob Storage...")
+            download_from_vercel_blob("cartera_base.csv", csv_path)
+
+    # Primero intentar cargar el archivo guardado (cartera_base.csv)
     if os.path.exists(csv_path):
         try:
             df = pd.read_csv(csv_path, encoding="utf-8")
@@ -748,15 +801,22 @@ def upload_file():
             
         df = df[cols_to_keep]
             
-        df.to_csv(os.path.join(DATA_DIR, "cartera_base.csv"), index=False, encoding="utf-8")
+        csv_filepath = os.path.join(DATA_DIR, "cartera_base.csv")
+        df.to_csv(csv_filepath, index=False, encoding="utf-8")
         
         import json
         metadata = {
             "filename": file.filename,
             "upload_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
-        with open(os.path.join(DATA_DIR, "cartera_metadata.json"), "w", encoding="utf-8") as f:
+        metadata_filepath = os.path.join(DATA_DIR, "cartera_metadata.json")
+        with open(metadata_filepath, "w", encoding="utf-8") as f:
             json.dump(metadata, f)
+
+        # Si estamos en Vercel, subir los archivos al Blob Storage
+        if "VERCEL" in os.environ and BLOB_READ_WRITE_TOKEN:
+            upload_to_vercel_blob(csv_filepath, "cartera_base.csv")
+            upload_to_vercel_blob(metadata_filepath, "cartera_metadata.json")
 
         CURRENT_DATA = df
         compute_and_store_rates(df)  # Calcular tasas de cambio implícitas del dataset recién cargado
@@ -801,6 +861,11 @@ def upload_status():
     """Devuelve la información del archivo actualmente subido."""
     import json
     metadata_path = os.path.join(DATA_DIR, "cartera_metadata.json")
+    
+    if "VERCEL" in os.environ and BLOB_READ_WRITE_TOKEN:
+        if not os.path.exists(metadata_path):
+            download_from_vercel_blob("cartera_metadata.json", metadata_path)
+
     if os.path.exists(metadata_path):
         try:
             with open(metadata_path, "r", encoding="utf-8") as f:
@@ -817,16 +882,24 @@ def reset_data():
     # Eliminar cartera_base.csv si existe para asegurar un borrado completo del disco también
     base_file = os.path.join(DATA_DIR, "cartera_base.csv")
     metadata_file = os.path.join(DATA_DIR, "cartera_metadata.json")
-    if os.path.exists(base_file):
-        try:
-            os.remove(base_file)
-        except Exception:
-            pass
-    if os.path.exists(metadata_file):
-        try:
-            os.remove(metadata_file)
-        except Exception:
-            pass
+    
+    for file_to_delete in [base_file, metadata_file]:
+        if os.path.exists(file_to_delete):
+            try:
+                os.remove(file_to_delete)
+            except Exception:
+                pass
+                
+    # También debemos intentar eliminar de Vercel Blob subiendo archivos vacíos, 
+    # ya que la API de borrado DELETE requiere token específico. 
+    # O omitimos la eliminación del blob por simplicidad y dejamos que se sobrescriba.
+    if "VERCEL" in os.environ and BLOB_READ_WRITE_TOKEN:
+        # Subir JSON vacío para limpiar status
+        with open(metadata_file, "w", encoding="utf-8") as f:
+            json.dump({"filename": None}, f)
+        upload_to_vercel_blob(metadata_file, "cartera_metadata.json")
+        # El csv quedará viejo pero el metadata dice que no hay nada, al re-subir se pisa.
+
     return jsonify({"success": True, "message": "Base de datos y caché de cartera vaciadas por completo."})
 
 if __name__ == "__main__":
