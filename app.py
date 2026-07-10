@@ -5,7 +5,8 @@ import pandas as pd
 from flask import Flask, jsonify, request, render_template, send_file, make_response
 import io
 import json
-import requestsapp = Flask(__name__)
+import requests
+app = Flask(__name__)
 
 # Configuración del directorio de trabajo
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
