@@ -171,11 +171,22 @@ def generate_mock_data():
     return df
 
 def get_data():
-    """Obtiene el conjunto de datos de trabajo actual. Inicia en vacío por requerimiento del usuario."""
+    """Obtiene el conjunto de datos de trabajo actual. Intenta cargar desde el archivo subido si existe."""
     global CURRENT_DATA
     if CURRENT_DATA is not None:
         return CURRENT_DATA
         
+    # Primero intentar cargar el archivo guardado (cartera_base.csv)
+    csv_path = os.path.join(DATA_DIR, "cartera_base.csv")
+    if os.path.exists(csv_path):
+        try:
+            df = pd.read_csv(csv_path, encoding="utf-8")
+            CURRENT_DATA = df
+            compute_and_store_rates(df)
+            return CURRENT_DATA
+        except Exception as e:
+            print("Error cargando cartera_base.csv:", e)
+            
     real_data = load_and_parse_real_excel()
     if real_data is not None:
         CURRENT_DATA = real_data
@@ -738,6 +749,15 @@ def upload_file():
         df = df[cols_to_keep]
             
         df.to_csv(os.path.join(DATA_DIR, "cartera_base.csv"), index=False, encoding="utf-8")
+        
+        import json
+        metadata = {
+            "filename": file.filename,
+            "upload_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        with open(os.path.join(DATA_DIR, "cartera_metadata.json"), "w", encoding="utf-8") as f:
+            json.dump(metadata, f)
+
         CURRENT_DATA = df
         compute_and_store_rates(df)  # Calcular tasas de cambio implícitas del dataset recién cargado
         
@@ -776,6 +796,19 @@ def get_currency_rates():
     return jsonify(rates)
 
 
+@app.route("/api/upload/status")
+def upload_status():
+    """Devuelve la información del archivo actualmente subido."""
+    import json
+    metadata_path = os.path.join(DATA_DIR, "cartera_metadata.json")
+    if os.path.exists(metadata_path):
+        try:
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                return jsonify(json.load(f))
+        except Exception:
+            return jsonify({"filename": None})
+    return jsonify({"filename": None})
+
 @app.route("/api/reset")
 def reset_data():
     """Reinicia el dataset activo a vacío."""
@@ -783,9 +816,15 @@ def reset_data():
     CURRENT_DATA = None
     # Eliminar cartera_base.csv si existe para asegurar un borrado completo del disco también
     base_file = os.path.join(DATA_DIR, "cartera_base.csv")
+    metadata_file = os.path.join(DATA_DIR, "cartera_metadata.json")
     if os.path.exists(base_file):
         try:
             os.remove(base_file)
+        except Exception:
+            pass
+    if os.path.exists(metadata_file):
+        try:
+            os.remove(metadata_file)
         except Exception:
             pass
     return jsonify({"success": True, "message": "Base de datos y caché de cartera vaciadas por completo."})

@@ -849,6 +849,32 @@ document.addEventListener("DOMContentLoaded", () => {
         await loadFilterOptions();
         await loadCurrencyRates();
         await fetchDashboardData();
+        
+        // Cargar estado de archivo subido
+        try {
+            const res = await fetch("/api/upload/status");
+            const data = await res.json();
+            
+            // Para la nueva tarjeta de Archivo Actual
+            const previewActive = document.getElementById("current-file-preview");
+            const previewInactive = document.getElementById("no-file-preview");
+            const displayFilename = document.getElementById("display-filename");
+            const displayUploadTime = document.getElementById("display-upload-time");
+            
+            if (data.filename) {
+                if (previewActive && previewInactive && displayFilename && displayUploadTime) {
+                    displayFilename.textContent = data.filename;
+                    displayUploadTime.textContent = data.upload_time;
+                    previewActive.style.display = "flex";
+                    previewInactive.style.display = "none";
+                }
+            } else {
+                if (previewActive) previewActive.style.display = "none";
+                if (previewInactive) previewInactive.style.display = "flex";
+            }
+        } catch (e) {
+            console.error("Error fetching upload status:", e);
+        }
     };
     
     initializeDashboard();
@@ -900,6 +926,24 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("Error al resetear datos simulados: ", e);
         }
     });
+    
+    // Botón para eliminar archivo actual
+    const btnDeleteFile = document.getElementById("btn-delete-file");
+    if (btnDeleteFile) {
+        btnDeleteFile.addEventListener("click", async () => {
+            if (confirm("¿Estás seguro de que deseas eliminar el archivo actual y volver a los datos por defecto?")) {
+                try {
+                    const res = await fetch("/api/reset");
+                    const data = await res.json();
+                    if (data.success) {
+                        await initializeDashboard();
+                    }
+                } catch (e) {
+                    console.error("Error al eliminar el archivo: ", e);
+                }
+            }
+        });
+    }
     
     // 9. Módulo de Carga ETL y Drag & Drop
     const dragDropArea = document.getElementById("drag-drop-area");

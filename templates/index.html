@@ -269,8 +269,8 @@
                             <i data-lucide="info"></i>
                         </div>
                         <div class="info-text">
-                            <h4>Estructuración para Power BI en un Clic</h4>
-                            <p>Esta herramienta procesa un archivo plano de facturas en Excel y genera automáticamente la estructura en <strong>Modelo Estrella</strong> (Tabla de hechos y dimensiones). Esto evita transformaciones de datos manuales y repetitivas.</p>
+                            <h4>Procesador de Datos de Cartera</h4>
+                            <p>Esta herramienta procesa un archivo plano de facturas en Excel y genera automáticamente la estructura necesaria para tu análisis.</p>
                         </div>
                     </div>
                     
@@ -301,80 +301,44 @@
                             </div>
                         </div>
                         
-                        <!-- Card: Export -->
-                        <div class="action-card">
+                        <!-- Card: Archivo Actual -->
+                        <div class="action-card" id="current-file-card">
                             <div class="action-card-header">
-                                <i data-lucide="download" class="icon-download"></i>
-                                <h3>Centro de Descargas</h3>
-                                <p>Exporta las tablas listas para conectar a Power BI</p>
+                                <i data-lucide="file-check-2" class="icon-download" style="color: #10b981; background: rgba(16, 185, 129, 0.1);"></i>
+                                <h3>Archivo Actual</h3>
+                                <p>Información del archivo de cartera procesado</p>
                             </div>
                             
                             <div class="export-preview-list">
-                                <div class="preview-item">
-                                    <div class="item-icon">
-                                        <i data-lucide="sheet"></i>
+                                <div class="preview-item" id="current-file-preview" style="display: none; border-left: 3px solid #10b981;">
+                                    <div class="item-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                                        <i data-lucide="file-spreadsheet"></i>
                                     </div>
-                                    <div class="item-details">
-                                        <h4>ModeloEstrella_Cartera.xlsx</h4>
-                                        <p>Libro de Excel consolidado con 3 hojas: FactCartera, DimClientes y DimFechas.</p>
+                                    <div class="item-details" style="flex: 1;">
+                                        <h4 id="display-filename" style="color: #f8fafc; margin-bottom: 4px;"></h4>
+                                        <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 0;">Subido el: <strong id="display-upload-time" style="color: #cbd5e1; font-weight: 500;"></strong></p>
+                                    </div>
+                                    <div style="margin-left: 10px;">
+                                        <button id="btn-delete-file" class="btn btn-secondary btn-sm" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05);" title="Eliminar archivo actual">
+                                            <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                                        </button>
                                     </div>
                                 </div>
-                            </div>
-                            
-                            <button class="btn btn-primary btn-block" id="btn-export-excel">
-                                <i data-lucide="file-down"></i>
-                                <span>Descargar Modelo Estrella (Excel)</span>
-                            </button>
-                            
-                            <div class="template-download-section">
-                                <p>¿No tienes un archivo de cartera a la mano? Descarga el formato base y pruébalo.</p>
-                                <a href="/api/export/star-schema" class="template-link">
-                                    <i data-lucide="help-circle"></i> Descargar plantilla de ejemplo estructurada
-                                </a>
+                                
+                                <div class="preview-item" id="no-file-preview" style="border-left: 3px solid #64748b; opacity: 0.7;">
+                                    <div class="item-icon" style="background: rgba(100, 116, 139, 0.1); color: #94a3b8;">
+                                        <i data-lucide="file-question"></i>
+                                    </div>
+                                    <div class="item-details">
+                                        <h4 style="color: #cbd5e1;">Sin archivo</h4>
+                                        <p style="color: #64748b;">Aún no se ha cargado un archivo de cartera en el sistema.</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Star Schema Explanation -->
-                    <div class="schema-explanation">
-                        <h3>El Modelo Estrella que hemos diseñado para ti</h3>
-                        <p>Cuando importas estos datos a Power BI, no necesitarás hacer limpieza manual. Las tablas están estructuradas de la siguiente forma:</p>
-                        
-                        <div class="schema-cards">
-                            <div class="schema-card-item">
-                                <h4>📊 FactCartera (Tabla de Hechos)</h4>
-                                <ul>
-                                    <li><code>FacturaID</code>: Código identificador</li>
-                                    <li><code>ClienteID</code>: Clave de relación con clientes</li>
-                                    <li><code>FechaFacturaKey</code>: Relación con DimFechas</li>
-                                    <li><code>FechaVencimientoKey</code>: Relación con DimFechas</li>
-                                    <li><code>FechaPagoKey</code>: Relación con DimFechas</li>
-                                    <li><code>MontoFacturado</code>, <code>MontoRecaudado</code>, <code>Saldo</code></li>
-                                    <li><code>DiasMora</code> y <code>TramoMora</code></li>
-                                </ul>
-                            </div>
-                            <div class="schema-card-item">
-                                <h4>👤 DimClientes (Tabla Dimensión)</h4>
-                                <ul>
-                                    <li><code>ClienteID</code>: Clave única por cliente</li>
-                                    <li><code>ClienteNombre</code>: Razón Social</li>
-                                    <li><code>Sector</code>: Tipo de actividad</li>
-                                    <li><code>Region</code>: Ubicación (Girardot, Bogotá, etc.)</li>
-                                    <li><code>Riesgo</code>: Segmento (Bajo, Medio, Alto)</li>
-                                </ul>
-                            </div>
-                            <div class="schema-card-item">
-                                <h4>📅 DimFechas (Tabla Dimensión)</h4>
-                                <ul>
-                                    <li><code>DateKey</code>: Clave primaria de fecha</li>
-                                    <li><code>Fecha</code>: Fecha Calendario</li>
-                                    <li><code>Año</code>, <code>MesNum</code>, <code>MesNombre</code></li>
-                                    <li><code>Trimestre</code> y <code>DiaSemana</code></li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    <!-- Modelo Estrella Explanation Removed -->
             </section>
             
             <!-- Page: DAX & PBI Integration -->
