@@ -240,16 +240,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 labels: sectorData.labels,
                 datasets: [{
                     data: sectorData.values,
-                    backgroundColor: [
-                        'rgba(14, 165, 233, 0.6)',
-                        'rgba(16, 185, 129, 0.6)',
-                        'rgba(139, 92, 246, 0.6)',
-                        'rgba(245, 158, 11, 0.6)',
-                        'rgba(249, 115, 22, 0.6)'
-                    ],
-                    borderColor: [
-                        '#0ea5e9', '#10b981', '#8b5cf6', '#f59e0b', '#f97316'
-                    ],
+                    backgroundColor: sectorData.labels.map((_, i) => {
+                        const colors = ['rgba(14, 165, 233, 0.6)', 'rgba(16, 185, 129, 0.6)', 'rgba(139, 92, 246, 0.6)', 'rgba(245, 158, 11, 0.6)', 'rgba(249, 115, 22, 0.6)'];
+                        return colors[i % colors.length];
+                    }),
+                    borderColor: sectorData.labels.map((_, i) => {
+                        const colors = ['#0ea5e9', '#10b981', '#8b5cf6', '#f59e0b', '#f97316'];
+                        return colors[i % colors.length];
+                    }),
                     borderWidth: 1.5,
                     hoverOffset: 12
                 }]
@@ -333,16 +331,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 labels: riesgoData.labels,
                 datasets: [{
                     data: riesgoData.values,
-                    backgroundColor: [
-                        'rgba(16, 185, 129, 0.65)',  // Cat. A - Verde
-                        'rgba(14, 165, 233, 0.65)',  // Cat. B - Azul
-                        'rgba(245, 158, 11, 0.65)',  // Cat. C - Amarillo
-                        'rgba(249, 115, 22, 0.65)',  // Cat. D - Naranja
-                        'rgba(239, 68, 68, 0.65)'    // Cat. E - Rojo
-                    ],
-                    borderColor: [
-                        '#10b981', '#0ea5e9', '#f59e0b', '#f97316', '#ef4444'
-                    ],
+                    backgroundColor: riesgoData.labels.map((_, i) => {
+                        const colors = ['rgba(16, 185, 129, 0.65)', 'rgba(14, 165, 233, 0.65)', 'rgba(245, 158, 11, 0.65)', 'rgba(249, 115, 22, 0.65)', 'rgba(239, 68, 68, 0.65)'];
+                        return colors[i % colors.length];
+                    }),
+                    borderColor: riesgoData.labels.map((_, i) => {
+                        const colors = ['#10b981', '#0ea5e9', '#f59e0b', '#f97316', '#ef4444'];
+                        return colors[i % colors.length];
+                    }),
                     borderWidth: 1.5,
                     hoverOffset: 12
                 }]
@@ -641,12 +637,15 @@ document.addEventListener("DOMContentLoaded", () => {
         const container = document.getElementById("custom-filial-container");
         if (!nativeSelect || !container) return;
         
-        // Evitar duplicación de listeners si ya existe el wrapper
         let wrapper = container.querySelector(".custom-multiselect-wrapper");
-        if (!wrapper) {
-            wrapper = document.createElement("div");
-            wrapper.className = "custom-multiselect-wrapper";
-            container.appendChild(wrapper);
+        if (wrapper) {
+            nativeSelect.dispatchEvent(new Event("change"));
+            return;
+        }
+        
+        wrapper = document.createElement("div");
+        wrapper.className = "custom-multiselect-wrapper";
+        container.appendChild(wrapper);
             
             let display = document.createElement("div");
             display.className = "custom-multiselect-display";
@@ -742,10 +741,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Pequeño timeout para dejar que otros listeners se ejecuten si es necesario
                 setTimeout(updateUI, 10);
             });
-        } else {
-            // Si el wrapper ya existe, solo disparamos change para forzar el updateUI()
-            nativeSelect.dispatchEvent(new Event("change"));
-        }
     };
     
     // 8. Opciones de Filtro Autocompletadas desde Backend
