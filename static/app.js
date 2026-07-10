@@ -285,7 +285,7 @@ document.addEventListener("DOMContentLoaded", () => {
         chartClientes = new Chart(ctxClientes, {
             type: 'bar',
             data: {
-                labels: clienteData.labels.map(l => l.length > 25 ? l.substring(0, 22) + "..." : l),
+                labels: clienteData.labels.map(l => { const s = String(l || ""); return s.length > 25 ? s.substring(0, 22) + "..." : s; }),
                 datasets: [{
                     label: 'Cartera Vencida',
                     data: clienteData.values,

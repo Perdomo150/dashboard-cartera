@@ -542,18 +542,18 @@ def get_kpis():
 def get_chart_mora():
     """Agregación de mora filtrada por tramos."""
     df = get_filtered_data()
+    order = ["Al día", "1 - 30 días", "31 - 60 días", "61 - 90 días", "Más de 90 días"]
     if df.empty:
-        return jsonify({"labels": ["Al día", "1 - 30 días", "31 - 60 días", "61 - 90 días", "Más de 90 días"], "values": [0]*5})
+        return jsonify({"labels": order, "values": [0]*5})
         
     fact_cartera, _, _ = process_etl(df)
-    mora_agg = fact_cartera.groupby("TramoMora")["Saldo"].sum().reset_index()
     
-    order = ["Al día", "1 - 30 días", "31 - 60 días", "61 - 90 días", "Más de 90 días"]
-    mora_agg["TramoMora"] = pd.Categorical(mora_agg["TramoMora"], categories=order, ordered=True)
-    mora_agg = mora_agg.sort_values("TramoMora").reset_index(drop=True)
+    # Asegurar que todas las categorías estén presentes, incluso si están en 0
+    mora_agg = fact_cartera.groupby("TramoMora")["Saldo"].sum().reindex(order, fill_value=0.0).reset_index()
+    mora_agg.rename(columns={"index": "TramoMora"}, inplace=True) # Para compatibilidad dependiendo de la versión de pandas
     
     return jsonify({
-        "labels": mora_agg["TramoMora"].tolist(),
+        "labels": order,
         "values": mora_agg["Saldo"].tolist()
     })
 
@@ -571,7 +571,7 @@ def get_chart_clientes():
     client_agg = client_agg.sort_values(by="Saldo", ascending=False).head(10)
     
     return jsonify({
-        "labels": client_agg["ClienteNombre"].tolist(),
+        "labels": client_agg["ClienteNombre"].fillna("Desconocido").astype(str).tolist(),
         "values": client_agg["Saldo"].tolist()
     })
 
@@ -588,7 +588,7 @@ def get_chart_sectores():
     sector_agg = merged.groupby("Sector")["Saldo"].sum().reset_index()
     
     return jsonify({
-        "labels": sector_agg["Sector"].tolist(),
+        "labels": sector_agg["Sector"].fillna("General").astype(str).tolist(),
         "values": sector_agg["Saldo"].tolist()
     })
 
