@@ -58,8 +58,14 @@ def download_from_vercel_blob(filename, dest_path):
             blob_url = target_blob['url']
             file_resp = requests.get(blob_url)
             file_resp.raise_for_status()
-            with open(dest_path, 'wb') as f:
+            
+            # Escribir en un archivo temporal y luego renombrar atómicamente para evitar race conditions
+            import uuid
+            temp_path = f"{dest_path}.tmp.{uuid.uuid4().hex}"
+            with open(temp_path, 'wb') as f:
                 f.write(file_resp.content)
+            os.replace(temp_path, dest_path)
+            
             return True
         return False
     except Exception as e:
