@@ -142,8 +142,10 @@ def load_and_parse_real_excel():
         homologated["MontoFacturado"] = monto_original_usd
         homologated["MontoRecaudado"] = homologated["MontoFacturado"] - homologated["Saldo"]
         
-        # 5. Parámetros adicionales
-        homologated["TasaCostoOportunidad"] = 0.12
+        # 5. Parámetros adicionales (Implementación de IBL+)
+        tasa_ibl_base = 0.10
+        spread = 0.02
+        homologated["TasaCostoOportunidad"] = tasa_ibl_base + spread
         homologated["VentasCredito"] = homologated["MontoFacturado"] * 1.5
         homologated["Riesgo"] = "Medio"
         
@@ -215,7 +217,7 @@ def generate_mock_data():
             "MontoFacturado": monto_facturado,
             "MontoRecaudado": monto_recaudado,
             "Saldo": saldo,
-            "TasaCostoOportunidad": 0.12,
+            "TasaCostoOportunidad": 0.10 + 0.02, # IBL+ (Base 10% + Spread 2%)
             "VentasCredito": ventas_credito
         })
         
@@ -262,6 +264,19 @@ def get_data():
     ]
     return pd.DataFrame(columns=cols)
 
+def fetch_trm():
+    """Consulta la TRM actual desde el API del Banco de la República (Socrata)."""
+    try:
+        url = "https://www.datos.gov.co/resource/32sa-8pi3.json?$limit=1&$order=vigenciasta%20DESC"
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data and len(data) > 0:
+                return float(data[0]["valor"])
+    except Exception as e:
+        print(f"Error fetching TRM: {e}")
+    return None
+
 def compute_and_store_rates(df):
     """Calcula la tasa de cambio promedio ponderada (Moneda Local / USD) por divisa.
     
@@ -296,6 +311,12 @@ def compute_and_store_rates(df):
                 rate = round(float(total_local / total_usd), 6)
                 CURRENCY_RATES[moneda] = rate
                 print(f"[Tasas] {moneda}/USD calculada: {rate:,.4f} ({len(valid)} facturas válidas)")
+                
+    # Sobrescribir con TRM oficial de Banco de la República si existe la moneda COP (o forzar su disponibilidad)
+    trm_oficial = fetch_trm()
+    if trm_oficial:
+        CURRENCY_RATES["COP"] = trm_oficial
+        print(f"[Tasas] COP/USD actualizada con TRM Oficial: {trm_oficial:,.2f}")
 
 
 def get_filtered_data():
@@ -348,7 +369,7 @@ def process_etl(df):
         
     # Clasificación de Tramos de Mora
     def clasificar_tramo(mora):
-        if mora == 0:
+        if mora <= 0:
             return "Al día"
         elif 1 <= mora <= 30:
             return "1 - 30 días"
@@ -370,11 +391,24 @@ def process_etl(df):
             dias_para_pagar_list.append(None)
     df_copy["DiasParaPagar"] = dias_para_pagar_list
     
-    # 1. Dimensión Clientes
+    # 1. Dimensión Clientes y Validación
     dim_clientes_cols = ["ClienteID", "ClienteNombre", "Sector", "Region", "Riesgo"]
     if "UnidadNegocio" in df_copy.columns:
         dim_clientes_cols.append("UnidadNegocio")
     dim_clientes = df_copy[dim_clientes_cols].drop_duplicates().reset_index(drop=True)
+    
+    # Lógica de Validación de Clientes (Data Quality)
+    def validar_cliente(row):
+        cid = str(row["ClienteID"]).strip().upper()
+        cnm = str(row["ClienteNombre"]).strip().upper()
+        invalid_ids = ["S/D", "S/N", "NAN", "NONE", "", "0"]
+        if cid in invalid_ids:
+            return False
+        if "DESCONOCIDO" in cnm or cnm in ["", "NAN", "NONE"]:
+            return False
+        return True
+        
+    dim_clientes["ClienteValido"] = dim_clientes.apply(validar_cliente, axis=1)
     
     # 2. Dimensión Fechas
     min_date = df_copy["FechaFactura"].min()
@@ -565,20 +599,24 @@ def get_chart_mora():
 
 @app.route("/api/charts/clientes")
 def get_chart_clientes():
-    """Retorna top 10 clientes críticos filtrados."""
+    """Retorna top 10 clientes críticos filtrados y el total de mora para cálculos de representatividad."""
     df = get_filtered_data()
     if df.empty:
-        return jsonify({"labels": [], "values": []})
+        return jsonify({"labels": [], "values": [], "total_mora": 0.0})
         
     fact_cartera, dim_clientes, _ = process_etl(df)
     
     merged = pd.merge(fact_cartera, dim_clientes, on="ClienteID")
-    client_agg = merged[merged["DiasMora"] > 0].groupby("ClienteNombre")["Saldo"].sum().reset_index()
+    mora_df = merged[merged["DiasMora"] > 0]
+    total_mora = float(mora_df["Saldo"].sum())
+    
+    client_agg = mora_df.groupby("ClienteNombre")["Saldo"].sum().reset_index()
     client_agg = client_agg.sort_values(by="Saldo", ascending=False).head(10)
     
     return jsonify({
         "labels": client_agg["ClienteNombre"].fillna("Desconocido").astype(str).tolist(),
-        "values": client_agg["Saldo"].tolist()
+        "values": client_agg["Saldo"].tolist(),
+        "total_mora": total_mora
     })
 
 @app.route("/api/charts/sectores")
@@ -719,8 +757,12 @@ def upload_file():
             homologated["MontoFacturado"] = monto_original_usd
             homologated["MontoRecaudado"] = homologated["MontoFacturado"] - homologated["Saldo"]
             
-            # Parámetros adicionales
-            homologated["TasaCostoOportunidad"] = 0.12
+            # Parámetros adicionales (Implementación de IBL+)
+            # IBL (Indicador Base de Liquidación/Referencia) + Spread
+            tasa_ibl_base = 0.10  # 10% base
+            spread = 0.02         # 2% de spread adicional
+            tasa_ibl_plus = tasa_ibl_base + spread
+            homologated["TasaCostoOportunidad"] = tasa_ibl_plus
             homologated["VentasCredito"] = homologated["MontoFacturado"] * 1.5
             homologated["Riesgo"] = "Medio"
             homologated["DiasMora"] = pd.to_numeric(df["DIAS MORA"], errors="coerce").fillna(0.0).astype(int)
@@ -779,7 +821,9 @@ def upload_file():
             if "MontoRecaudado" not in df.columns:
                 df["MontoRecaudado"] = df["MontoFacturado"] - df["Saldo"]
             if "TasaCostoOportunidad" not in df.columns:
-                df["TasaCostoOportunidad"] = 0.12
+                tasa_ibl_base = 0.10
+                spread = 0.02
+                df["TasaCostoOportunidad"] = tasa_ibl_base + spread
             if "VentasCredito" not in df.columns:
                 df["VentasCredito"] = df["MontoFacturado"] * 1.5
             if "FechaPago" not in df.columns:

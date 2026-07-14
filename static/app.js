@@ -268,7 +268,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                return ` Saldo: ${formatActiveVal(context.raw)}`;
+                                const value = context.raw;
+                                let total = 0;
+                                const dataArr = context.chart.data.datasets[0].data;
+                                dataArr.forEach(val => { total += val; });
+                                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) + "%" : "0%";
+                                return ` Saldo: ${formatActiveVal(value)} (${percentage})`;
                             }
                         }
                     }
@@ -303,7 +308,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                return ` Saldo Vencido: ${formatActiveVal(context.raw)}`;
+                                const val = context.raw;
+                                const total = clienteData.total_mora || val;
+                                const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                                return ` Saldo Vencido: ${formatActiveVal(val)} (${pct}% del riesgo total)`;
                             }
                         }
                     }
@@ -471,11 +479,11 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="map-popup-body">
                             <div class="map-popup-row">
                                 <span>Cartera Total:</span>
-                                <span class="val">${formatCurrency(f.cartera_total, displayCurr)}</span>
+                                <span class="val">${formatActiveVal(f.cartera_total)}</span>
                             </div>
                             <div class="map-popup-row">
                                 <span>Cartera Vencida:</span>
-                                <span class="val text-red">${formatCurrency(f.cartera_vencida, displayCurr)}</span>
+                                <span class="val text-red">${formatActiveVal(f.cartera_vencida)}</span>
                             </div>
                             <div class="map-popup-row">
                                 <span>Clientes Activos:</span>
